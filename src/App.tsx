@@ -36,7 +36,7 @@ export function App() {
   let page: React.ReactNode;
   if (location.pathname === "/") page = <HomePage />;
   else if (location.pathname === "/works") page = <WorksPage />;
-  else if (/^\/works\/[^/]+$/.test(location.pathname)) page = <ProjectPage />;
+  else if (/^\/works\/[^/]+$/.test(location.pathname)) page = <ProjectPage key={location.pathname} />;
   else if (location.pathname === "/about") page = <AboutPage />;
   else if (location.pathname === "/en") page = <HomePage english />;
   else page = <Navigate to="/" replace />;

@@ -26,16 +26,17 @@ const project = {
 
 // Follow the repository's transpile-and-render convention without adding a test
 // framework. Only browser state/context is stubbed; actual image markup is rendered.
-function loadSource(entry, { admin = false } = {}) {
+function loadSource(entry, { admin = false, fixture = project, search = "" } = {}) {
   const cache = new Map();
   const stubs = new Map([
     [path.join(root, 'router'), {
       Link: ({ to, children, ...props }) => React.createElement('a', { href: to, ...props }, children),
       Navigate: () => null,
-      useParams: () => ({ slug: project.slug }),
+      useParams: () => ({ slug: fixture.slug }),
+      useLocation: () => ({ search }),
     }],
     [path.join(root, 'ProjectsContext'), {
-      useProjects: () => ({ projects: [project], loading: false, refresh: async () => {} }),
+      useProjects: () => ({ projects: [fixture], loading: false, refresh: async () => {} }),
     }],
     [path.join(root, 'components/Reveal'), {
       Reveal: ({ children, className }) => React.createElement('div', { className }, children),
@@ -223,4 +224,74 @@ test('authenticated admin previews request only 480px thumbnails and load lazily
     assert.equal(attr(img, 'loading'), 'lazy');
     assert.equal(attr(img, 'decoding'), 'async');
   });
+});
+
+
+const videos = [0, 1].map(index => ({
+  id: `01234567-89ab-4cde-8fab-0123456789a${index}`,
+  src: `/api/videos/01234567-89ab-4cde-8fab-0123456789a${index}`,
+  name: `Film ${index}`, status: 'ready', width: index ? 1080 : 1920,
+  height: index ? 1920 : 1080, contentType: 'video/mp4',
+}));
+const watchProject = { ...project, published: true, videos, summary: 'Introduction', credits: 'Production team' };
+
+test('video cards keep the canonical direct project URL and existing responsive thumbnail', () => {
+  const { ProjectCard } = loadSource('components/ProjectCard.tsx');
+  const markup = render(ProjectCard, { project: watchProject });
+  assert.ok(markup.includes('href="/works/fixture"'));
+  assert.equal(imgTags(markup).length, 1);
+  assert.ok(!markup.includes('<video'));
+});
+
+test('ready videos open above title, introduction, credits and lazy supplemental images in any category', () => {
+  for (const category of ['automotive', 'cg-ai', 'fmcg', 'video', 'bts']) {
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category } });
+    const markup = render(ProjectPage);
+    assert.ok(!markup.includes('class="project-hero"'));
+    assert.equal((markup.match(/<video /g) || []).length, 1);
+    assert.ok(markup.indexOf('<video') < markup.indexOf('<h1'));
+    assert.ok(markup.indexOf('<h1') < markup.indexOf('Introduction'));
+    assert.ok(markup.indexOf('Production team') < markup.indexOf('class="project-gallery'));
+    assert.ok(markup.includes(`src="${videos[0].src}"`));
+    assert.ok(markup.includes('controls=""') && markup.includes('playsinline=""'));
+    assert.ok(markup.includes('preload="metadata"'));
+    assert.ok(!/autoplay/i.test(markup));
+    assert.ok(markup.includes('aria-label="选择视频"'));
+    assert.ok(imgTags(markup).every(img => attr(img, 'loading') === 'lazy'));
+  }
+});
+
+test('selection deep links encode IDs, preserve other query parameters and reject unknown/non-ready IDs', () => {
+  const helper = loadSource('lib/videos.ts');
+  assert.equal(helper.selectedVideo(videos, ''), videos[0]);
+  assert.equal(helper.selectedVideo(videos, `?video=${videos[1].id}`), videos[1]);
+  for (const query of ['?video=../../private', '?video=https://evil.invalid/file', '?video=%', '?video=missing']) {
+    assert.equal(helper.selectedVideo(videos, query), videos[0]);
+  }
+  assert.equal(helper.videoLink('a b', 'unsafe?&#/', '?capture=1'), '/works/a%20b?capture=1&video=unsafe%3F%26%23%2F');
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: watchProject, search: `?video=${videos[1].id}` });
+  const markup = render(ProjectPage);
+  assert.ok(markup.includes(`src="${videos[1].src}"`));
+  assert.ok(!markup.includes(`src="${videos[0].src}"`));
+  assert.ok(markup.includes('aspect-ratio:1080 / 1920'));
+  assert.equal((markup.match(/aria-current="true"/g) || []).length, 1);
+});
+
+test('watch selection only admits ready canonical media from the supplied public project', () => {
+  const helper = loadSource('lib/videos.ts');
+  const candidates = [videos[0], ...['uploading', 'queued', 'processing', 'failed'].map(status => ({ ...videos[1], status })),
+    { ...videos[1], id: '../../private' }, { ...videos[1], src: 'https://evil.invalid/video.mp4' },
+    { ...videos[1], src: videos[0].src }];
+  assert.deepEqual(helper.playableVideos({ ...watchProject, videos: candidates }), [videos[0]]);
+  assert.deepEqual(helper.playableVideos({ ...watchProject, published: false }), []);
+  assert.deepEqual(helper.playableVideos({ ...project, videos: undefined }), []);
+});
+
+test('video-category projects without playable media retain image detail and single videos need no selector', () => {
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category: 'video', videos: [{ ...videos[0], status: 'processing' }] } });
+  assert.ok(render(ProjectPage).includes('class="project-hero"'));
+  const { ProjectPage: Single } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, videos: [videos[0]], images: [] } });
+  const markup = render(Single);
+  assert.ok(markup.includes('<video'));
+  assert.ok(!markup.includes('aria-label="选择视频"'));
 });

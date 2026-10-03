@@ -1,6 +1,8 @@
 import { ArrowLeft, ArrowRight, Maximize2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Lightbox } from "../components/Lightbox";
+import { ProjectWatch } from "../components/ProjectWatch";
+import { playableVideos } from "../lib/videos";
 import { Reveal } from "../components/Reveal";
 import { categoryLabels } from "../data";
 import { highPriorityImage, projectGallerySizes, responsiveImage } from "../lib/images";
@@ -19,12 +21,13 @@ export function ProjectPage() {
   if (projectIndex < 0) return <Navigate to="/works" replace />;
 
   const project = projects[projectIndex];
+  const videos = playableVideos(project);
   const previous = projects[(projectIndex - 1 + projects.length) % projects.length];
   const next = projects[(projectIndex + 1) % projects.length];
 
   return (
-    <main className="project-page">
-      <section className="project-hero">
+    <main className={`project-page${videos.length ? " project-watch-page" : ""}`}>
+      {videos.length ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
         <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt={project.cover.alt} width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
         <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
@@ -33,7 +36,7 @@ export function ProjectPage() {
           <h1>{project.title}</h1>
           <p>{project.titleEn}</p>
         </div>
-      </section>
+      </section>}
 
       <section className="project-information">
         <div className="project-facts">
@@ -41,10 +44,12 @@ export function ProjectPage() {
           <div><span>类别</span><strong>{categoryLabels[project.category]}</strong></div>
           <div><span>服务</span><strong>{project.discipline}</strong></div>
         </div>
-        <Reveal>
+        {videos.length ? <p className="project-summary">{project.summary}</p> : <Reveal>
           <p className="project-summary">{project.summary}</p>
-        </Reveal>
+        </Reveal>}
       </section>
+
+      {videos.length > 0 && project.credits && <section className="project-credit"><span>Credits</span><p>{project.credits}</p></section>}
 
       <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
@@ -58,21 +63,10 @@ export function ProjectPage() {
         ))}
       </section>
 
-      {project.videos?.some((video) => video.status === "ready") && (
-        <section className="project-videos" aria-label="项目视频">
-          {project.videos.filter((video) => video.status === "ready").map((video) => (
-            <figure key={video.id}>
-              <video src={video.src} controls playsInline preload="metadata" aria-label={video.name} />
-              <figcaption>{video.name}</figcaption>
-            </figure>
-          ))}
-        </section>
-      )}
-
-      <section className="project-credit">
+      {!videos.length && <section className="project-credit">
         <span>Credits</span>
         <p>{project.credits}</p>
-      </section>
+      </section>}
 
       <nav className="project-pagination" aria-label="项目导航">
         <Link to={`/works/${previous.slug}`}>

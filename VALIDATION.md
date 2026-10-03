@@ -117,3 +117,13 @@ Browser suite was retried, but Chromium still failed before opening a page (`soc
 - `npm run test:ui` retried; Chromium still aborts before any page/assertion with `socket() failed: Operation not permitted`. No browser screenshots, image-quality visual signoff, network-selection timing, Docker deployment or real TLS/proxy tests passed in this environment
 - No live server, remote repository, credentials or production data changed in this task
 - Final combined `npm run build`, `npm run lint`, syntax checks, and `npm test` passed: **52/52 tests**. Independent review reran the overlapping-width deletion regression 30 times without orphan derivatives
+
+
+## Direct video watch pages — 2026-10-03
+
+- Existing index/card and project URLs now open a single primary native player when the public project contains ready videos; no intermediate cover/intro screen. Title, introduction and credits follow the player, then lazy supplemental photographs. Image-only details and responsive card thumbnails remain unchanged
+- Media availability, not category, determines the layout. Multi-video selection uses `?video=<id>`, preserves other query parameters and replaces the keyed player without accumulating players; clicking the current selection does not add duplicate history. Project-path changes reset image-lightbox state
+- Only ready canonical local video URLs in the current public project are selectable. Unknown/non-ready/deleted/query-injected IDs fall back to the first ready video. No backend/auth changes or migration; existing draft/visibility/byte-range protections remain in place
+- Final build/TypeScript, ESLint, all `.mjs` syntax checks and `npm test` passed: **57/57 tests**, including five new markup/helper regressions covering every category, direct card links, player-first ordering, native controls/no autoplay, portrait aspect ratios, one-player selection, safe ID lookup and image-only fallback
+- Updated browser suite includes index → player, actual fixture playback, multi-video deep links, repeated-current clicks, Back/Forward, desktop/mobile overflow and supplemental photo lightbox. `npm run test:ui` was attempted but Chromium aborted before opening a page with `socket() failed: Operation not permitted`. **No browser assertions, screenshots, visual responsive QA or actual playback passed** in this environment; markup/helper checks are not browser QA
+- No staging/production writes, server deployment, remote GitHub publication, or MCP implementation performed as part of this change

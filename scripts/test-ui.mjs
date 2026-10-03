@@ -185,12 +185,59 @@ try {
   const publicPage = await context.newPage();
   await publicPage.goto(`${origin}/works/${slug}`);
   await publicPage.getByRole('heading', { name: 'UI 测试已发布', exact: true }).waitFor();
-  await publicPage.locator('.project-videos video').waitFor();
+  await publicPage.locator('.watch-player').waitFor();
   assert.equal((await fetch(origin + videoSrc)).status, 200);
-  await publicPage.waitForFunction(() => document.querySelector('.project-videos video')?.readyState >= 1);
+  await publicPage.waitForFunction(() => document.querySelector('.watch-player')?.readyState >= 1);
   await publicPage.locator('.project-gallery button').first().click();
   await publicPage.getByRole('dialog').waitFor();
   await publicPage.keyboard.press('Escape');
+  // Index opens directly to the player, not a cover/intro stage.
+  await publicPage.goto(`${origin}/works`);
+  await publicPage.locator(`.project-card a[href="/works/${slug}"]`).click();
+  await publicPage.locator('.watch-player').waitFor();
+  assert.equal(await publicPage.locator('.project-hero').count(), 0);
+  assert.equal(await publicPage.locator('video').count(), 1);
+  assert.equal(await publicPage.locator('video').getAttribute('autoplay'), null);
+  await publicPage.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
+  assert.equal(await publicPage.locator('video').evaluate(video => video.paused), true);
+  await publicPage.locator('video').evaluate(video => video.play());
+  await publicPage.waitForFunction(() => document.querySelector('video')?.currentTime > 0);
+  await publicPage.locator('video').evaluate(video => video.pause());
+
+  // Isolated second ready video exercises selection, deep links and history.
+  const publicProjects = await (await fetch(`${origin}/api/projects`)).json();
+  const watchProject = publicProjects.find(project => project.slug === slug);
+  const secondId = '01234567-89ab-4cde-8fab-0123456789ab';
+  const secondSrc = `/api/videos/${secondId}`;
+  const firstId = watchProject.videos[0].id;
+  watchProject.videos.push({ ...watchProject.videos[0], id: secondId, src: secondSrc, name: 'Portrait version', width: 1080, height: 1920 });
+  const videoBytes = Buffer.from(await (await fetch(origin + videoSrc)).arrayBuffer());
+  await publicPage.route('**/api/projects', route => route.fulfill({ json: publicProjects }));
+  await publicPage.route(`**${secondSrc}`, route => route.fulfill({ contentType: 'video/mp4', body: videoBytes }));
+  await publicPage.goto(`${origin}/works/${slug}`);
+  const initialHistoryLength = await publicPage.evaluate(() => history.length);
+  await publicPage.locator('.watch-selection a').first().click();
+  assert.equal(await publicPage.evaluate(() => history.length), initialHistoryLength);
+  await publicPage.locator('.watch-selection a').nth(1).click();
+  assert.equal(new URL(publicPage.url()).searchParams.get('video'), secondId);
+  assert.equal(await publicPage.locator('video').getAttribute('src'), secondSrc);
+  await publicPage.locator('.watch-selection a').first().click();
+  assert.equal(new URL(publicPage.url()).searchParams.get('video'), firstId);
+  await publicPage.goBack();
+  assert.equal(await publicPage.locator('video').getAttribute('src'), secondSrc);
+  await publicPage.goForward();
+  assert.equal(await publicPage.locator('video').getAttribute('src'), videoSrc);
+  await publicPage.goto(`${origin}/works/${slug}?video=${secondId}`);
+  await publicPage.locator('.watch-selection [aria-current="true"]').waitFor();
+  assert.equal(await publicPage.locator('video').getAttribute('src'), secondSrc);
+  for (const width of [1440, 390, 320]) {
+    await publicPage.setViewportSize({ width, height: 844 });
+    assert.equal(await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    if (artifacts) await publicPage.screenshot({ path: path.join(artifacts, `watch-${width}.png`) });
+  }
+  await publicPage.goto(`${origin}/works/${slug}?video=..%2Fprivate`);
+  await publicPage.locator('video').waitFor();
+  assert.equal(await publicPage.locator('video').getAttribute('src'), videoSrc);
   await publicPage.close();
 
   if (artifacts) {
