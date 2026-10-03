@@ -5,3 +5,5 @@ dist
 .env
 *.tar.gz
 artifacts
+
+config/site.json

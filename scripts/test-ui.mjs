@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rm, access, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, access, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,10 +12,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const directory = await mkdtemp(path.join(tmpdir(), 'twoquarters-ui-'));
 const port = Number(process.env.UI_TEST_PORT || 3100);
 const origin = `http://127.0.0.1:${port}`;
-const env = { ...process.env, NODE_ENV: 'test', DATA_DIR: directory, APP_ORIGIN: origin, PORT: String(port), HOST: '127.0.0.1' };
+const env = { ...process.env, NODE_ENV: 'test', DATA_DIR: directory, SITE_CONFIG_FILE: path.join(directory, 'site.json'), APP_ORIGIN: origin, PORT: String(port), HOST: '127.0.0.1' };
 const password = randomBytes(24).toString('hex');
 const runFixture = (script, input) => execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: root, env, input, stdio: ['pipe', 'pipe', 'pipe'] });
 runFixture(`import {hashPassword} from './server/auth.mjs'; import {db} from './server/store.mjs'; let password=''; for await(const chunk of process.stdin) password+=chunk; db.prepare('INSERT INTO users VALUES(?,?)').run('ui-test',await hashPassword(password)); db.close();`, password);
+await writeFile(env.SITE_CONFIG_FILE, JSON.stringify({
+  secret: 'not-public',
+  filing: { icp: { number: '测试 ICP（非真实备案）', url: 'https://example.com/icp' }, publicSecurity: { number: '测试公安（非真实备案）', url: 'https://example.com/police' }, other: [{ label: '<script>literal text</script>' }, { label: '' }] },
+  socialLinks: [{ label: '小红书', url: 'https://example.com/profile' }, { label: 'Custom social', url: 'https://example.com/custom' }],
+}));
 const server = spawn(process.execPath, ['server/index.mjs'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let output = '';
 server.stdout.on('data', chunk => { output += chunk; });
@@ -55,6 +60,35 @@ try {
 
   await page.goto(`${origin}/works`);
   await count('.works-grid .project-card', 6);
+  await count('.footer-filings li', 3);
+  await count('.footer-socials a', 2);
+  assert.equal(await page.locator('.footer-filings script').count(), 0);
+  assert.equal(await page.locator('.footer-filings li').last().textContent(), '<script>literal text</script>');
+  for (const link of await page.locator('.footer-filings a, .footer-socials a').all()) {
+    assert.equal(await link.getAttribute('target'), '_blank');
+    assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.locator('.site-footer').scrollIntoViewIfNeeded();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  if (artifacts) { await mkdir(artifacts, { recursive: true }); await page.screenshot({ path: path.join(artifacts, 'footer-mobile.png') }); }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  if (artifacts) await page.locator('.site-footer').screenshot({ path: path.join(artifacts, 'footer-desktop.png') });
+  await page.goto(`${origin}/en`);
+  await page.getByRole('navigation', { name: 'Social media' }).waitFor();
+  await page.getByRole('list', { name: 'Site registration' }).waitFor();
+  await page.route('**/api/site-config', route => route.fulfill({ status: 500, body: 'unavailable' }));
+  await page.goto(`${origin}/works`);
+  await count('.works-grid .project-card', 6);
+  assert.equal(await page.locator('.footer-filings, .footer-socials').count(), 0);
+  await page.unroute('**/api/site-config');
+  await page.route('**/api/site-config', route => route.fulfill({ contentType: 'application/json', body: '{"filingItems":[],"socialLinks":[]}' }));
+  await page.reload();
+  await count('.works-grid .project-card', 6);
+  assert.equal(await page.locator('.footer-filings, .footer-socials').count(), 0);
+  await page.unroute('**/api/site-config');
+  await page.reload();
+  await count('.footer-filings li', 3);
   assert.deepEqual(await page.locator('.filter-tabs button').evaluateAll(buttons => buttons.map(button => button.childNodes[0].textContent)), ['全部','汽车','CG&AI','快消','视频','幕后影像']);
   await page.getByRole('tab', { name: '快消' }).click();
   await count('.works-grid .project-card', 1);

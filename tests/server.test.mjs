@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtemp, rm, stat, cp } from 'node:fs/promises';
+import { mkdtemp, rm, stat, cp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
 const cwd=process.cwd(), origin='http://127.0.0.1:3198';
 let child,dir,cookie='',csrf='';
-async function start(){child=spawn(process.execPath,['server/index.mjs'],{cwd,env:{...process.env,DATA_DIR:dir,PORT:'3198',APP_ORIGIN:origin},stdio:['ignore','pipe','pipe']});let log='';child.stderr.on('data',d=>log+=d);for(let i=0;i<100;i++){if(child.exitCode!==null)throw new Error(log);try{if((await fetch(origin+'/api/session')).ok)return;}catch{}await delay(50);}throw new Error('Server start timed out '+log);}
+async function start(){child=spawn(process.execPath,['server/index.mjs'],{cwd,env:{...process.env,DATA_DIR:dir,SITE_CONFIG_FILE:path.join(dir,'site.json'),PORT:'3198',APP_ORIGIN:origin},stdio:['ignore','pipe','pipe']});let log='';child.stderr.on('data',d=>log+=d);for(let i=0;i<100;i++){if(child.exitCode!==null)throw new Error(log);try{if((await fetch(origin+'/api/session')).ok)return;}catch{}await delay(50);}throw new Error('Server start timed out '+log);}
 async function stop(){if(!child)return;const p=new Promise(resolve=>child.once('exit',resolve));child.kill('SIGTERM');await p;child=null;}
 async function req(route,{method='GET',body,auth=false,token=true,from=origin}={}){const headers={};if(method!=='GET')headers.Origin=from;if(auth){headers.Cookie=cookie;if(token)headers['X-CSRF-Token']=csrf;}if(body&&!(body instanceof FormData))headers['Content-Type']='application/json';return fetch(origin+route,{method,headers,body:body?body instanceof FormData?body:JSON.stringify(body):undefined});}
 async function json(route,opts){const res=await req(route,opts);return [res,await res.json()];}
@@ -19,7 +19,13 @@ test('self-contained auth, CRUD, uploads, privacy, and restart persistence',asyn
   const init=spawn(process.execPath,['scripts/admin.mjs','test-admin','--stdin'],{cwd,env:{...process.env,DATA_DIR:dir},stdio:['pipe','pipe','pipe']});init.stdin.end('Test-only-local-password-2026\n');assert.equal(await new Promise(r=>init.on('exit',r)),0);
   // Simulate an existing installation using the retired fashion category.
   execFileSync(process.execPath,['--input-type=module','-e',`import {db,seed} from './server/store.mjs';seed();db.exec("UPDATE projects SET data=json_set(data,'$.category','fashion') WHERE json_extract(data,'$.category')='fmcg'");db.close();`],{cwd,env:{...process.env,DATA_DIR:dir}});
+  await writeFile(path.join(dir,'site.json'),JSON.stringify({secret:'not-public',filing:{icp:{number:'测试备案（非真实）',url:'https://example.com/verify'}},socialLinks:[{label:'小红书',url:'https://example.com/profile'}]}));
   await start();
+  const configResponse=await req('/api/site-config');
+  assert.equal(configResponse.status,200);assert.equal(configResponse.headers.get('cache-control'),'no-store');
+  assert.deepEqual(await configResponse.json(),{filingItems:[{label:'测试备案（非真实）',url:'https://example.com/verify'}],socialLinks:[{label:'小红书',url:'https://example.com/profile'}]});
+  assert.equal((await req('/api/site-config',{method:'POST',body:{}})).status,401);
+  assert.equal((await req('/config/site.json')).status,404);
   assert.equal((await stat(dir)).mode&0o777,0o700);assert.equal((await stat(path.join(dir,'portfolio.sqlite'))).mode&0o777,0o600);
   let [r,list]=await json('/api/projects');assert.equal(r.status,200);assert.equal(list.length,6);assert.equal((await req(list[0].cover.src)).status,200);
   assert.equal((await req('/api/admin/projects')).status,401);

@@ -93,3 +93,37 @@ After login, the admin page shows the filesystem containing `DATA_DIR`: total, u
 Use **刷新空间** or reload to refresh the sample without saving/discarding a project draft. The authenticated, no-store `GET /api/admin/storage` exposes numeric totals only, never host paths; unavailable filesystem statistics produce a generic error. This is not a per-container quota report: filesystem reporting can differ from hosting quotas, Docker writable-layer limits and actual ability to write. If `uploads/` is on a separate mount, its available bytes are shown separately for video admission. One new video requires 1 GiB reserve plus 500 MiB for each active job and the new job; displayed eligibility is only the space check, and upload-time checks and queue/concurrency limits remain authoritative.
 
 Selectable project categories, in order: **汽车、CG&AI、快消、视频、幕后影像**. Existing `automotive` and `bts` records retain their identities; the user-approved `fashion` → `fmcg` migration runs on startup and preserves all other project metadata and image references. New sample content uses `fmcg`. Uploading a video does not change its project's category. Back up the data directory before upgrading as usual.
+
+## Footer filing information and social links (runtime configuration)
+
+The footer supports ICP and public-security filing numbers, additional filing text/verification links, and any number of named social profiles (up to 20). No actual filing numbers or social accounts are supplied. Labels appear as configured on both Chinese and English pages. Empty numbers/labels are hidden; an additional filing item may be plain text. A social item requires both a label and a URL. No icons, SDKs or external services are loaded: external websites are visited only when the visitor clicks a link.
+
+The optional server-side JSON file is read **once at startup** via `SITE_CONFIG_FILE`. Without that environment variable, the footer has no filing or social entries. Edits require a server restart/recreation, **not a frontend rebuild**. The public, read-only `GET /api/site-config` returns only normalized `filingItems` and `socialLinks`, never the original config, extra keys, filesystem paths, or credentials. Keep this file outside `public/` and `dist/`; do not put secrets in it. Fetch errors/timeouts hide these optional rows without breaking browsing. An explicitly configured missing, unreadable, oversized (>64 KiB), malformed or invalid file fails server startup with a generic error rather than silently omitting required filing information.
+
+Copy the empty template without overwriting an existing config:
+
+    mkdir -p config
+    test -e config/site.json || cp config/site.example.json config/site.json
+    chmod 755 config
+    chmod 644 config/site.json
+
+Edit `config/site.json` locally. This public-information file must be readable by the unprivileged container user (UID 1000); it is excluded from Git and Docker build context. Schema:
+
+- `filing.icp`: `{ "number": "", "url": "https://beian.miit.gov.cn/" }`
+- `filing.publicSecurity`: `{ "number": "", "url": "https://beian.mps.gov.cn/" }`
+- `filing.other`: array of `{ "label": "", "url": "" }` (up to 20)
+- `socialLinks`: array of `{ "label": "", "url": "" }` (up to 20)
+
+Fill in only your real approved registration text and official verification URLs; for public-security registration, use the full verification URL provided for your registration. Social labels can be 小红书, 微博, 抖音, Instagram, or any custom name; add the real profile URL yourself. Empty strings in this documentation are intentional. Labels/numbers are limited to 200 characters; URLs to 2048. Links must be absolute `http://` or `https://` URLs without credentials, whitespace, control characters or backslashes; prefer HTTPS. HTML is rendered as text, never executed. All external links use `noopener noreferrer`.
+
+Docker opt-in (base Compose still works with no config file):
+
+    docker compose -f compose.yaml -f compose.filing.yaml up -d --build
+
+The override mounts **only** `config/site.json`, read-only, and refuses to auto-create a missing host path. It does not mount or expose the containing directory. After editing/replacing the file, run `docker compose -f compose.yaml -f compose.filing.yaml up -d --force-recreate portfolio` to ensure the new bind-mounted file is read. Use both Compose files for subsequent lifecycle commands. Keep a copy of this config alongside your deployment backups; it is not in the data volume.
+
+Bare Node:
+
+    SITE_CONFIG_FILE=/absolute/path/to/site.json APP_ORIGIN=http://localhost:3000 npm start
+
+A static-only frontend host has no server config endpoint and will show no optional footer entries; deploy the included same-origin Node server for this feature.

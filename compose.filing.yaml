@@ -1,0 +1,13 @@
+# Optional: docker compose -f compose.yaml -f compose.filing.yaml up -d
+# First create config/site.json from the example; no automatic host-directory creation.
+services:
+  portfolio:
+    environment:
+      SITE_CONFIG_FILE: /app/config/site.json
+    volumes:
+      - type: bind
+        source: ./config/site.json
+        target: /app/config/site.json
+        read_only: true
+        bind:
+          create_host_path: false

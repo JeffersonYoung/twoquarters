@@ -5,3 +5,5 @@ data/
 artifacts/
 *.tsbuildinfo
 *.tar.gz
+
+config/site.json

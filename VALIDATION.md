@@ -64,3 +64,16 @@ Browser suite was retried, but Chromium still failed before opening a page (`soc
 - All five exact category values accepted for new projects; old fashion creation rejected; an old persisted fashion record migrated on startup to fmcg with images intact and readable
 - Browser script includes exact public/admin category order, storage display, refresh failure/recovery and unsaved-draft preservation; **not executed** because Chromium again aborted before opening a page with `socket() failed: Operation not permitted`
 - No visual QA or deployment claimed; prior Docker/Compose and production-access limitations still apply
+
+## Configurable footer validation — 2026-10-03
+
+- Final TypeScript/Vite build and ESLint: passed
+- `npm test`: **31/31 passed**, including all existing storage/category/auth/image and 15 real-FFmpeg video scenarios
+- Config unit tests: empty defaults, ICP/public-security/other entries, extensible social profiles, field allowlisting, secret/path exclusion, bounded file/array/text sizes, malformed JSON/data, missing files, unsafe protocols, credentials and URL-normalization tricks
+- Live local HTTP test: anonymous no-store config read, exact allowlisted response, no config file download, unauthorized mutation denied, existing data backup/restart checks still pass
+- Frontend request tests: same-origin request with abort signal, defensive URL parsing, offline/non-JSON/error response handling
+- React static-render tests: empty rows omitted, literal HTML escaped, plain-text filing entry supported, meaningful accessible labels, external links carry `target="_blank"` and `rel="noopener noreferrer"`
+- Node syntax checks for config/server/browser-test scripts passed
+- Browser script now covers desktop/mobile footer, Chinese/English accessibility labels, HTML-as-text, empty/error configuration and existing regressions. Chromium failed before opening a page with `socket() failed: Operation not permitted`, including the permitted elevated retry; **no browser assertions, screenshots or visual QA passed**
+- Optional Docker bind configuration and permissions reviewed statically only; Docker/Compose CLI remains unavailable
+- No database schema changes, actual filing numbers/social accounts, production credentials, deployment or GitHub push for this change

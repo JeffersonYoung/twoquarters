@@ -81,3 +81,37 @@
 点击“刷新空间”或重新加载页面更新数据；刷新空间不会影响未保存的项目资料。`GET /api/admin/storage` 仅管理员可访问，禁止缓存且不返回主机路径。文件系统统计失败时显示可重试错误。磁盘容量不等同于主机商配额或容器独立额度；若上传目录单独挂载，另显该盘的视频可用空间。视频上传至少保留 1GiB，另为每个活动任务和新任务各留 500MiB。界面仅显示采样时空间条件，实际上传还会再次检查空间以及队列、并发限制。
 
 项目分类依次为：**汽车、CG&AI、快消、视频、幕后影像**。按已确认要求，启动时自动将旧 `fashion`（时尚与美妆）归入 `fmcg`（快消），保留其他资料和图片引用；新示例也使用快消。原汽车和幕后影像数据保持原分类标识。上传视频不会自动改变项目分类。升级前请照常备份完整数据目录。
+
+## 页脚备案信息与社交媒体链接（运行时配置）
+
+备案号和社交账号由服务端 JSON 文件决定，不预置任何真实备案号或账号。支持 ICP、公安备案、其他备案项目，以及小红书、微博、抖音、Instagram 等任意自定义社交链接。中英文页面均显示配置的文字。备案文字为空则隐藏，可只显示文字、不设链接；社交项目必须同时有名称和链接才显示。不会加载外部图标、SDK 或服务，只有访客点击时才打开外部网页。
+
+未设置 `SITE_CONFIG_FILE` 时完全隐藏这些可选内容。文件在服务启动时读取，修改后需重启/重新创建容器，**不需要重建前端**。公开只读接口 `/api/site-config` 仅返回经校验的 `filingItems` 和 `socialLinks`，不会返回原始配置、其他字段、路径或凭据。配置应放在 `public/`、`dist/` 之外，不要写入秘密信息。前端请求失败或超时不会影响浏览。显式指定的配置文件不存在、不可读、超过 64 KiB、JSON 或字段无效时，服务会启动失败并输出不包含路径/内容的通用错误，避免备案配置错误被静默忽略。
+
+初次创建，不覆盖已有文件：
+
+    mkdir -p config
+    test -e config/site.json || cp config/site.example.json config/site.json
+    chmod 755 config
+    chmod 644 config/site.json
+
+本文件仅存公开展示信息，须允许容器内非 root 用户（UID 1000）读取。`config/site.json` 已从 Git 和 Docker 构建上下文排除。编辑结构：
+
+- `filing.icp`：`{ "number": "", "url": "https://beian.miit.gov.cn/" }`
+- `filing.publicSecurity`：`{ "number": "", "url": "https://beian.mps.gov.cn/" }`
+- `filing.other`：`{ "label": "", "url": "" }` 数组，最多 20 项
+- `socialLinks`：`{ "label": "", "url": "" }` 数组，最多 20 项
+
+请填写实际获批的备案文字及对应官方查询链接；公安备案请使用您的完整查询链接。社交媒体 `label` 可填“小红书”等任意名称，`url` 填自己的真实主页。示例空值是刻意保留的，不代表实际备案。文字最多 200 字符、链接最多 2048 字符。链接只接受完整 HTTP(S) URL，禁止用户名/密码、空白、控制字符和反斜杠，建议 HTTPS。文字中的 HTML 不会执行；外链使用 `noopener noreferrer`。
+
+Docker 可选启用（原始 Compose 无配置文件也能运行）：
+
+    docker compose -f compose.yaml -f compose.filing.yaml up -d --build
+
+附加文件只读挂载单个 `config/site.json`，不会挂载整个目录，也不会自动创建缺失的宿主路径。编辑/替换文件后执行 `docker compose -f compose.yaml -f compose.filing.yaml up -d --force-recreate portfolio`，保证读取新文件；后续管理命令也使用这两个 Compose 文件。配置文件不在数据卷内，请单独随部署备份。
+
+裸 Node 启动：
+
+    SITE_CONFIG_FILE=/absolute/path/to/site.json APP_ORIGIN=http://localhost:3000 npm start
+
+仅托管静态前端时没有此配置接口，可选页脚内容不会显示；请使用项目自带的同源 Node 服务。

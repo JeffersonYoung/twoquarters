@@ -1,3 +1,4 @@
+import { loadSiteConfig } from './site-config.mjs';
 import { storageOverview } from './storage.mjs';
 import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
 import sharp from 'sharp';
@@ -12,6 +13,7 @@ const origin=new URL(process.env.APP_ORIGIN||`http://localhost:${port}`).origin;
 if(process.env.NODE_ENV==='production'&&!origin.startsWith('https://')) throw new Error('Production requires APP_ORIGIN=https://your-domain');
 const secure=origin.startsWith('https://');
 const cookie=(value,maxAge)=>`tq_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
+const siteConfig = await loadSiteConfig();
 seed();
 await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -47,6 +49,7 @@ async function handle(req,res){
     if(req.headers['x-csrf-token']!==current.csrf)fail('页面已过期，请刷新后重试',403);
    }
   }
+  if(route==='/api/site-config'&&method==='GET')return json(res,siteConfig);
   if(route==='/api/session'&&method==='GET')return json(res,{admin:!!current,csrfToken:current?.csrf||null});
   if(route==='/api/login'&&method==='POST'){
    const value=await input(req),username=typeof value?.username==='string'?value.username.trim():'';
