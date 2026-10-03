@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
+import { highPriorityImage, responsiveImage } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
 import { Link } from "../router";
 
@@ -17,7 +18,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
   return (
     <main>
       <section className="home-hero">
-        <img src="/images/automotive/hero-mclaren.jpg" alt={english ? "Red supercar in motion" : "行驶中的红色超级跑车"} />
+        <img {...responsiveImage("/images/automotive/hero-mclaren.jpg", [480, 960, 1600], "100vw")} {...highPriorityImage} alt={english ? "Red supercar in motion" : "行驶中的红色超级跑车"} loading="eager" decoding="async" />
         <div className="hero-shade" />
         <div className="hero-topline">
           <span>{english ? "Independent image production" : "独立影像制作机构"}</span>
@@ -58,7 +59,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
         <div className="home-projects">
           {featured.map((project, index) => (
             <Reveal key={project.slug} delay={(index % 2) * 80}>
-              <ProjectCard project={project} index={index} />
+              <ProjectCard project={project} index={index} loading="lazy" />
             </Reveal>
           ))}
         </div>

@@ -38,6 +38,7 @@ import {
   type ProjectDraft,
 } from "../lib/projects";
 import { Link } from "../router";
+import { imageVariant } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
 
 const emptyDraft: ProjectDraft = {
@@ -553,7 +554,7 @@ export function AdminPage() {
                   const isCover = selected.cover?.id === image.id || selected.cover?.src === image.src;
                   return (
                     <article key={image.id || image.src}>
-                      <figure><img src={image.src} alt={image.alt} /></figure>
+                      <figure><img src={imageVariant(image.src, 480)} alt={image.alt} loading="lazy" decoding="async" /></figure>
                       <div className="image-card-info">
                         <span>{String(index + 1).padStart(2, "0")}</span>
                         <p title={image.alt}>{image.alt}</p>

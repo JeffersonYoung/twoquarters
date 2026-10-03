@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Reveal } from "../components/Reveal";
+import { responsiveImage } from "../lib/images";
 
 const services = [
   ["01", "商业摄影", "汽车 / 人物 / 静物 / 美妆"],
@@ -35,7 +36,7 @@ export function AboutPage() {
       </section>
 
       <section className="about-image-band">
-        <img src="/images/bts/francesco-ungaro-P45gR9kH0SM-unsplash.jpg" alt="制作团队的环境勘景影像" />
+        <img {...responsiveImage("/images/bts/francesco-ungaro-P45gR9kH0SM-unsplash.jpg", [480, 960, 1600], "100vw")} alt="制作团队的环境勘景影像" loading="lazy" decoding="async" />
         <span>Observe / Build / Refine</span>
       </section>
 

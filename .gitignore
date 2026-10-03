@@ -7,3 +7,8 @@ artifacts/
 *.tar.gz
 
 config/site.json
+
+# Generated deterministically by prebuild
+public/images/**/*-480.webp
+public/images/**/*-960.webp
+public/images/**/*-1600.webp

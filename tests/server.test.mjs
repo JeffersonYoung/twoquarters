@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtemp, rm, stat, cp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, stat, cp, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -62,18 +62,33 @@ test('self-contained auth, CRUD, uploads, privacy, and restart persistence',asyn
   [r,created]=await json(endpoint+'/images',{method:'POST',body:form,auth:true});assert.equal(r.status,200);assert.equal(created.images.length,2);
   const image=created.images[0],second=created.images[1];
   const orientedResult=await sharp(Buffer.from(await (await req(second.src,{auth:true})).arrayBuffer())).metadata();assert.equal(orientedResult.width,8);assert.equal(orientedResult.height,12);assert.equal(orientedResult.orientation,undefined);assert.equal((await req(image.src)).status,404);assert.equal((await req(image.src,{auth:true})).status,200);
+  for(const width of [480,960,1600]) {
+   assert.equal((await req(image.src+'?width='+width)).status,404);
+   const preview=await req(image.src+'?width='+width,{auth:true});assert.equal(preview.status,200);assert.equal(preview.headers.get('content-type'),'image/webp');assert.equal(preview.headers.get('cache-control'),'private, no-store');
+   const meta=await sharp(Buffer.from(await preview.arrayBuffer())).metadata();assert.equal(meta.width,8);assert.equal(meta.height,8);
+  }
+  assert.equal(created.images[1].width,8);assert.equal(created.images[1].height,12);
+  assert.equal((await req(image.src+'?width=123',{auth:true})).status,400);
+  assert.equal((await req(image.src+'?width=480&width=960',{auth:true})).status,400);
   [r,created]=await json(endpoint+'/cover',{method:'POST',body:{imageId:second.id},auth:true});assert.equal(created.cover.id,second.id);
   assert.equal((await req(endpoint,{method:'PATCH',body:{...details,published:true},auth:true})).status,200);
   assert.equal((await req(image.src)).status,200);assert.equal((await (await req('/api/projects')).json()).length,7);
+  const preview=await req(image.src+'?width=480');assert.equal(preview.headers.get('cache-control'),'public, max-age=0, must-revalidate');assert.equal(preview.headers.get('vary'),'Cookie');const etag=preview.headers.get('etag');assert.ok(etag);
+  assert.equal((await fetch(origin+image.src+'?width=480',{headers:{'If-None-Match':etag}})).status,304);
+  assert.equal((await req(image.src+'?width=480',{method:'HEAD'})).headers.get('content-type'),'image/webp');
   await stop();
   const restored=await mkdtemp(path.join(tmpdir(),'tq-restored-'));
   await cp(dir,restored,{recursive:true});await rm(dir,{recursive:true,force:true});dir=restored;
   await start();assert.equal((await (await req('/api/projects')).json()).length,7);assert.equal((await req(image.src)).status,200);assert.equal((await req('/api/admin/projects',{auth:true})).status,200);
   assert.equal((await req(endpoint,{method:'PATCH',body:details,auth:true})).status,200);assert.equal((await req(image.src)).status,404);
+  assert.equal((await fetch(origin+image.src+'?width=480',{headers:{'If-None-Match':etag}})).status,404);
   assert.equal((await req(endpoint+'/images/'+second.id,{method:'DELETE',auth:true})).status,200);assert.equal((await req(second.src,{auth:true})).status,404);
+  assert.equal((await readdir(path.join(dir,'uploads'))).some(name=>name.includes(second.id)),false);
+  // Existing sample media is generated lazily, without database or initialization changes.
+  const samplePreview=await req(list[1].cover.src+'?width=480');assert.equal(samplePreview.status,200);assert.equal((await sharp(Buffer.from(await samplePreview.arrayBuffer())).metadata()).width,480);
   // Seed images are also protected after unpublishing.
-  const seed=list[1];assert.equal((await req('/api/admin/projects/'+seed.id,{method:'PATCH',body:{...seed,published:false},auth:true})).status,200);assert.equal((await req(seed.cover.src)).status,404);
-  assert.equal((await req(endpoint,{method:'DELETE',auth:true})).status,200);assert.equal((await req(image.src,{auth:true})).status,404);
+  const seed=list[1];assert.equal((await req('/api/admin/projects/'+seed.id,{method:'PATCH',body:{...seed,published:false},auth:true})).status,200);assert.equal((await req(seed.cover.src)).status,404);assert.equal((await req(seed.cover.src+'?width=480')).status,404);
+  assert.equal((await req(endpoint,{method:'DELETE',auth:true})).status,200);assert.equal((await req(image.src,{auth:true})).status,404);assert.equal((await readdir(path.join(dir,'uploads'))).some(name=>name.includes(image.id)),false);
   assert.equal((await req('/api/logout',{method:'POST',auth:true})).status,200);assert.equal((await req('/api/admin/projects',{auth:true})).status,401);
   for(const route of ['/server/auth.mjs','/data/portfolio.sqlite','/%2e%2e%2fserver%2fauth.mjs'])assert.equal((await req(route)).status,404);
   for(let i=0;i<10;i++)r=await req('/api/login',{method:'POST',body:{username:'test-admin',password:'wrong'}});assert.equal(r.status,429);

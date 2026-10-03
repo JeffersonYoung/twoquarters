@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { Lightbox } from "../components/Lightbox";
 import { Reveal } from "../components/Reveal";
 import { categoryLabels } from "../data";
+import { highPriorityImage, projectGallerySizes, responsiveImage } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
 import { Link, Navigate, useParams } from "../router";
 
@@ -24,7 +25,7 @@ export function ProjectPage() {
   return (
     <main className="project-page">
       <section className="project-hero">
-        <img src={project.cover.src} alt={project.cover.alt} />
+        <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt={project.cover.alt} width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
         <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
         <div className="project-hero-title">
@@ -49,7 +50,7 @@ export function ProjectPage() {
         {project.images.map((image, index) => (
           <Reveal key={image.src} className={`gallery-shot gallery-shot-${(index % 5) + 1}`}>
             <button type="button" onClick={() => setLightboxIndex(index)} aria-label={`查看大图：${image.alt}`}>
-              <img src={image.src} alt={image.alt} loading={index > 1 ? "lazy" : "eager"} />
+              <img {...responsiveImage(image.src, [960, 1600], projectGallerySizes(index), image.width)} alt={image.alt} width={image.width} height={image.height} loading="lazy" decoding="async" />
               <span className="shot-expand"><Maximize2 aria-hidden="true" /></span>
             </button>
             {image.credit && <p>{image.credit}</p>}

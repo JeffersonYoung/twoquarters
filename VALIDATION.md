@@ -106,3 +106,14 @@ Browser suite was retried, but Chromium still failed before opening a page (`soc
 - Final `npm test`: **40/40 passed**, including six sample-initialization scenarios, production transport and browser-fetch credential guards, and all existing video/storage/footer/auth/image regressions
 - Final `npm run test:ui` retry remains blocked before any page/assertion by Chromium process-socket permission failure; no visual or actual browser playback QA passed
 - Docker/Compose and real TLS/reverse-proxy deployment were not executed; no live server configuration or production data was changed
+
+## Responsive image optimization — 2026-10-03
+
+- Before: cards used the same original URL as detail/lightbox, with no responsive image variants
+- Added protected local WebP variants at fixed 480/960/1600 widths; new uploads precompute, existing uploads/sample images generate on demand with two encodes/32 waiting jobs and per-variant coalescing. Explicit `images:prepare` warmup ran twice against 27 isolated sample images: 108 original/variant files, project rows unchanged
+- New tests cover smaller dimensions/bytes, no upscaling, EXIF orientation, preserved originals, file permissions, cache reuse, overlapping-width generation/deletion, private/draft denial, ETag 304 with visibility revalidation, unpublish, delete cleanup, HEAD, rejected arbitrary/duplicate widths, and public-HTTP draft protection
+- React-render/helper tests verify responsive sources/sizes, eager hero, lazy below-fold/gallery/admin images, optional dimensions, and full-size originals only in the opened lightbox. These are markup tests, not actual browser network/layout measurements
+- Measured six bundled sample covers: original total 2,821,810 bytes; 480px WebP 115,082 bytes (95.9% smaller); 960px WebP 402,706 bytes (85.7% smaller), using quality 80. This measures encoded payload reduction only; no page-load timing claim is made
+- `npm run test:ui` retried; Chromium still aborts before any page/assertion with `socket() failed: Operation not permitted`. No browser screenshots, image-quality visual signoff, network-selection timing, Docker deployment or real TLS/proxy tests passed in this environment
+- No live server, remote repository, credentials or production data changed in this task
+- Final combined `npm run build`, `npm run lint`, syntax checks, and `npm test` passed: **52/52 tests**. Independent review reran the overlapping-width deletion regression 30 times without orphan derivatives

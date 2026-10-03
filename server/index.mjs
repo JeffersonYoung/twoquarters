@@ -3,8 +3,10 @@ import { loadSiteConfig } from './site-config.mjs';
 import { storageOverview } from './storage.mjs';
 import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
 import sharp from 'sharp';
+import { IMAGE_WIDTHS, imageVariant, prepareImageVariants, deleteImageFiles, stopImageQueue } from './images.mjs';
+import { createHash } from 'node:crypto';
 import http from 'node:http';
-import { readFile, writeFile, unlink, stat } from 'node:fs/promises';
+import { readFile, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { db, root, dataDir } from './store.mjs';
@@ -90,10 +92,23 @@ async function handle(req,res){
   }
   if(route.startsWith('/api/images/')&&(method==='GET'||method==='HEAD')){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
-   const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();let im;
-   for(const r of rows){const p=JSON.parse(r.data);im=p.images.find(x=>x.id===iid);if(im)break;}
-   if(!im?.storagePath)fail('图片不存在',404);
-   return sendFile(req,res,path.join(dataDir,'uploads',iid),im.contentType);
+   const lookup=()=>{
+    const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();
+    for(const r of rows){const im=JSON.parse(r.data).images.find(x=>x.id===iid);if(im?.storagePath)return im;}
+   };
+   const im=lookup();if(!im)fail('图片不存在',404);
+   const sizes=url.searchParams.getAll('width'),width=sizes.length?Number(sizes[0]):null;
+   if(sizes.length>1||(width!==null&&(!IMAGE_WIDTHS.includes(width)||sizes[0]!==String(width))))fail('无效图片尺寸');
+   const file=width===null?path.join(dataDir,'uploads',iid):await imageVariant(dataDir,iid,width);
+   let bytes;try{bytes=await readFile(file);}catch{fail('图片不存在',404);}
+   // Recheck after asynchronous work: unpublishing/deletion takes effect before delivery/304.
+   if(!lookup()||(current&&!session(req)))fail('图片不存在',404);
+   res.setHeader('Vary','Cookie');
+   res.setHeader('Cache-Control',current?'private, no-store':'public, max-age=0, must-revalidate');
+   const etag='"'+createHash('sha256').update(bytes).digest('hex')+'"';res.setHeader('ETag',etag);
+   if(req.headers['if-none-match']===etag){res.writeHead(304);return res.end();}
+   res.writeHead(200,{'Content-Type':width===null?im.contentType:'image/webp','Content-Length':bytes.length});
+   return res.end(method==='HEAD'?undefined:bytes);
   }
   if(route==='/api/admin/projects'&&method==='POST'){
    const d=draft(await input(req)),id=randomUUID();const slug=((d.titleEn||d.title).toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/[\s-]+/g,'-')||'project')+'-'+id.slice(0,8);
@@ -103,9 +118,9 @@ async function handle(req,res){
   if(match){
    const [,id,action,imageId]=match;
    if(!action&&method==='PATCH'){const p=getProject(id),d=draft(await input(req));if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
-   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await unlink(path.join(dataDir,'uploads',im.id)).catch(()=>{});return json(res,{ok:true});}
+   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
-   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await unlink(path.join(dataDir,'uploads',im.id)).catch(()=>{});return json(res,p);}
+   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,p);}
    if(action==='images'&&!imageId&&method==='POST'){
     getProject(id);if(!req.headers['content-type']?.startsWith('multipart/form-data;'))fail('需要图片表单',415);
     const bytes=await body(req,64*1024*1024);let form;try{form=await new Request(origin,{method:'POST',headers:{'Content-Type':req.headers['content-type']},body:bytes}).formData();}catch{fail('图片表单格式不正确');}
@@ -115,18 +130,19 @@ async function handle(req,res){
      if(typeof file==='string'||!file.size||file.size>12*1024*1024)fail('单张图片不能超过 12MB');total+=file.size;if(total>60*1024*1024)fail('单次上传不能超过 60MB');
      const b=Buffer.from(await file.arrayBuffer());const valid=file.type==='image/jpeg'?b[0]===255&&b[1]===216&&b[2]===255:file.type==='image/png'?b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):file.type==='image/gif'?['GIF87a','GIF89a'].includes(b.toString('ascii',0,6)):file.type==='image/webp'?b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP':false;
      if(!valid)fail('仅支持有效 JPEG、PNG、WebP 或 GIF 图片');
-     let clean;try {
+     let clean,dimensions;try {
       const decoder=sharp(b,{animated:true,limitInputPixels:40_000_000,failOn:'warning'});
       const meta=await decoder.metadata();
       if((meta.pages||1)>50 || (meta.width||0)*(meta.height||0)>40_000_000)fail('图片像素或帧数过多');
       clean=await decoder.autoOrient().toFormat(meta.format,{quality:95}).toBuffer();
+      const normalized=await sharp(clean).metadata();dimensions={width:normalized.width,height:normalized.pageHeight||normalized.height};
      }catch(e){if(e.status)throw e;fail('图片损坏或不能解码');}
-     const iid=randomUUID();images.push({id:iid,storagePath:iid,src:'/api/images/'+iid,alt:file.name.replace(/\.[^.]+$/,'').slice(0,160),contentType:file.type,bytes:clean});
+     const iid=randomUUID();images.push({id:iid,storagePath:iid,src:'/api/images/'+iid,alt:file.name.replace(/\.[^.]+$/,'').slice(0,160),contentType:file.type,...dimensions,bytes:clean});
     }
     const written=[];try{
-     for(const im of images){await writeFile(path.join(dataDir,'uploads',im.id),im.bytes,{flag:'wx',mode:0o600});written.push(im.id);delete im.bytes;}
+     for(const im of images){await writeFile(path.join(dataDir,'uploads',im.id),im.bytes,{flag:'wx',mode:0o600});written.push(im.id);await prepareImageVariants(dataDir,im.id);delete im.bytes;}
      const p=getProject(id);p.images.push(...images);p.cover ||= images[0];save(p);return json(res,p);
-    }catch(e){await Promise.all(written.map(i=>unlink(path.join(dataDir,'uploads',i)).catch(()=>{})));throw e;}
+    }catch(e){await Promise.all(written.map(i=>deleteImageFiles(dataDir,i)));throw e;}
    }
   }
   fail('未找到接口',404);
@@ -144,6 +160,6 @@ server.requestTimeout=10*60_000;server.headersTimeout=15_000;server.maxRequestsP
 server.listen(port,host,()=>console.log(`Twoquarters listening on ${host}:${server.address().port}; origin ${origin}`));
 for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{
  const stopped=stopVideoQueue();
- server.close(async()=>{await stopped;db.close();process.exit(0);});
+ server.close(async()=>{await stopped;await stopImageQueue();db.close();process.exit(0);});
  server.closeAllConnections();
 });

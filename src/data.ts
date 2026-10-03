@@ -7,6 +7,8 @@ export type ProjectImage = {
   storagePath?: string;
   alt: string;
   credit?: string;
+  width?: number;
+  height?: number;
 };
 
 export type ProjectVideo = {
@@ -46,4 +48,3 @@ export const categoryLabels: Record<ProjectCategory, string> = {
   video: "视频",
   bts: "幕后影像",
 };
-

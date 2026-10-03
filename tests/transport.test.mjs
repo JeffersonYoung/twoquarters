@@ -64,6 +64,7 @@ test('production public HTTP works; admin HTTP and spoofed proxy credentials fai
   }
   for(const route of ['/admin','/admin/anything','/%61dmin','/api/admin/projects','/api/login'])assert.equal((await req(route,{auth:true})).status,403,route);
   for(const https of [false,true])for(const kind of ['images','videos'])assert.equal((await req('/api/'+kind+'/'+image('2'),{https})).status,404);
+  assert.equal((await req('/api/images/'+image('2')+'?width=480',{auth:true})).status,404);
   for(const kind of ['images','videos']) {
    assert.equal((await req('/api/'+kind+'/'+image('2'),{auth:true})).status,404);
    assert.equal((await req('/api/'+kind+'/'+image('2'),{auth:true,https:true})).status,200);
