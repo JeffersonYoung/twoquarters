@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { initializeSamples } from '../server/samples.mjs';
 const root = process.cwd();
 function command(dir, args) { return spawnSync(process.execPath, args, { cwd: root, env: { ...process.env, DATA_DIR: dir }, encoding: 'utf8' }); }
-function store(dir) { const result = command(dir, ['--input-type=module', '-e', "import {db} from './server/store.mjs';db.close()"]); assert.equal(result.status, 0, result.stderr); return new DatabaseSync(path.join(dir, 'portfolio.sqlite')); }
+function store(dir) { if(!existsSync(path.join(dir,'portfolio.sqlite'))) {const init=command(dir,['scripts/database.mjs','init','--maintenance']);assert.equal(init.status,0,init.stderr);} const result = command(dir, ['--input-type=module', '-e', "import {db} from './server/store.mjs';db.close()"]); assert.equal(result.status, 0, result.stderr); return new DatabaseSync(path.join(dir, 'portfolio.sqlite')); }
 function temp() { return mkdtempSync(path.join(tmpdir(), 'tq-samples-')); }
 async function startEmpty(dir) {
  const child = spawn(process.execPath, ['server/index.mjs'], { cwd: root, env: { ...process.env, DATA_DIR: dir, SITE_CONFIG_FILE: '', HOST: '127.0.0.1', PORT: '3197', APP_ORIGIN: 'http://127.0.0.1:3197', NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -26,7 +26,7 @@ async function startEmpty(dir) {
 test('fresh and repeated startup stays empty, creates no settings or replacement marker table', async () => {
  const dir = temp();
  try {
-  await startEmpty(dir); await startEmpty(dir);
+  store(dir).close(); await startEmpty(dir); await startEmpty(dir);
   const db = new DatabaseSync(path.join(dir, 'portfolio.sqlite'));
   assert.deepEqual(db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(r => r.name), ['login_limits', 'projects', 'sessions', 'users', 'videos']);
   assert.equal(db.prepare('SELECT count(*) AS n FROM projects').get().n, 0);db.close();
@@ -53,7 +53,7 @@ test('existing custom content, media and legacy settings survive upgrade; no set
  const dir=temp();
  try {
   let db=store(dir);
-  const p={id:'own',slug:'own',category:'fashion',title:'Keep me',images:[{storagePath:'own-image'}],videos:[{storagePath:'own-video'}]};
+  const p={id:'own',slug:'own',category:'fmcg',title:'Keep me',images:[{storagePath:'own-image'}],videos:[{storagePath:'own-video'}]};
   db.prepare('INSERT INTO projects VALUES(?,?,?,?,?)').run(p.id,p.slug,JSON.stringify(p),0,9);
   db.exec("CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO settings VALUES('seed','repository-only-v1'),('custom','keep');");
   writeFileSync(path.join(dir,'uploads','own-image'),'image');writeFileSync(path.join(dir,'uploads','own-video'),'video');db.close();
@@ -89,7 +89,7 @@ test('partial import failure rolls back records and only new files, then explici
 test('orphan video records also prevent an import without altering records', () => {
  const dir=temp();
  try {
-  const db=store(dir);db.exec('CREATE TABLE videos(id TEXT PRIMARY KEY); INSERT INTO videos VALUES(\'orphan\')');
+  const db=store(dir);db.exec("INSERT INTO videos(id,project_id,name,status,input_type,created) VALUES('orphan','missing','fixture','failed','video/mp4',0)");
   assert.throws(()=>initializeSamples({db,root,dataDir:dir}),/video records already exist/);
   assert.equal(db.prepare('SELECT id FROM videos').get().id,'orphan');assert.deepEqual(readdirSync(path.join(dir,'uploads')),[]);db.close();
  } finally { rmSync(dir,{recursive:true,force:true}); }

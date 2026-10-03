@@ -15,6 +15,7 @@ const origin = `http://127.0.0.1:${port}`;
 const env = { ...process.env, NODE_ENV: 'test', DATA_DIR: directory, SITE_CONFIG_FILE: path.join(directory, 'site.json'), APP_ORIGIN: origin, PORT: String(port), HOST: '127.0.0.1' };
 const password = randomBytes(24).toString('hex');
 const runFixture = (script, input) => execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: root, env, input, stdio: ['pipe', 'pipe', 'pipe'] });
+execFileSync(process.execPath,['scripts/database.mjs','init','--maintenance'],{env:{...process.env,DATA_DIR:directory}});
 runFixture(`import {hashPassword} from './server/auth.mjs'; import {db} from './server/store.mjs'; let password=''; for await(const chunk of process.stdin) password+=chunk; db.prepare('INSERT INTO users VALUES(?,?)').run('ui-test',await hashPassword(password)); db.close();`, password);
 // Browser scenarios opt into their repository fixtures; normal startup is empty.
 execFileSync(process.execPath, ['scripts/init-samples.mjs'], { cwd: root, env });

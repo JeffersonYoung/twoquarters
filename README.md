@@ -1,3 +1,5 @@
+> Database deployment policy: application startup only validates the database. Before first installation, explicitly run `DATA_DIR=... npm run db:init` with the app stopped. Existing installations require a reviewed manual migration (`db:migrate`) and backup. Automatic deployments never initialize or migrate databases. See [database release policy](deploy/database-policy.md).
+
 # Twoquarters · self-hosted portfolio
 
 A standalone migration of the original portfolio UI. React/Vite frontend, Node 24 HTTP server, SQLite metadata and local image/video files. No Supabase, Sites, external authentication, remote image host, CDN, analytics or font service is used at runtime. Public visitors can browse without login over HTTP or HTTPS. In production, `/admin` and all management operations require the configured HTTPS origin and use an owner-created username/password.

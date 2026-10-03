@@ -28,6 +28,7 @@ test('production public HTTP works; admin HTTP and spoofed proxy credentials fai
  const token='a'.repeat(64), csrf='fixture-csrf';
  const image=id=>`${id}0000000-0000-0000-0000-000000000000`;
  try {
+  execFileSync(process.execPath,['scripts/database.mjs','init','--maintenance'],{env:{...process.env,DATA_DIR:dir}});
   execFileSync(process.execPath,['--input-type=module','-e',`
    import {db,dataDir} from './server/store.mjs';
    import './server/video.mjs';

@@ -16,9 +16,11 @@ const details={title:'Test draft',titleEn:'Test draft',category:'fmcg',year:'202
 test('self-contained auth, CRUD, uploads, privacy, and restart persistence',async()=>{
  dir=await mkdtemp(path.join(tmpdir(),'tq-api-'));
  try{
+  execFileSync(process.execPath,['scripts/database.mjs','init','--maintenance'],{cwd,env:{...process.env,DATA_DIR:dir}});
   const init=spawn(process.execPath,['scripts/admin.mjs','test-admin','--stdin'],{cwd,env:{...process.env,DATA_DIR:dir},stdio:['pipe','pipe','pipe']});init.stdin.end('Test-only-local-password-2026\n');assert.equal(await new Promise(r=>init.on('exit',r)),0);
   // Simulate an existing installation using the retired fashion category.
-  execFileSync(process.execPath,['--input-type=module','-e',`import {db,root,dataDir} from './server/store.mjs';import {initializeSamples} from './server/samples.mjs';initializeSamples({db,root,dataDir});db.exec("UPDATE projects SET data=json_set(data,'$.category','fashion') WHERE json_extract(data,'$.category')='fmcg'");db.close();`],{cwd,env:{...process.env,DATA_DIR:dir}});
+  execFileSync(process.execPath,['--input-type=module','-e',`import {db,root,dataDir} from './server/store.mjs';import {initializeSamples} from './server/samples.mjs';initializeSamples({db,root,dataDir});db.exec("UPDATE projects SET data=json_set(data,'$.category','fashion') WHERE json_extract(data,'$.category')='fmcg'");db.exec('PRAGMA user_version=0');db.close();`],{cwd,env:{...process.env,DATA_DIR:dir}});
+  execFileSync(process.execPath,['scripts/database.mjs','migrate','--maintenance'],{cwd,env:{...process.env,DATA_DIR:dir}});
   await writeFile(path.join(dir,'site.json'),JSON.stringify({secret:'not-public',filing:{icp:{number:'测试备案（非真实）',url:'https://example.com/verify'}},socialLinks:[{label:'小红书',url:'https://example.com/profile'}]}));
   await start();
   const configResponse=await req('/api/site-config');

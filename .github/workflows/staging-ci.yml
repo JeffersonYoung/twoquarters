@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -28,8 +29,25 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+  database-policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require manual deployment for database changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ]; then BASE_SHA=$(git rev-parse HEAD^); fi
+          node scripts/check-database-changes.mjs "$BASE_SHA" "$HEAD_SHA"
   deploy:
-    needs: validate
+    needs: [validate, database-policy]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15

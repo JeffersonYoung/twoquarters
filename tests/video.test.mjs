@@ -103,6 +103,7 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
     await command('ffmpeg', ['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=120x200:rate=12','-f','lavfi','-i','sine=frequency=660:sample_rate=48000','-t','0.5','-c:v','libvpx-vp9','-threads','2','-deadline','realtime','-c:a','libopus',webmPath]);
     const mp4 = await readFile(mp4Path), webm = await readFile(webmPath);
     const username = `video-${randomUUID()}`, password = randomUUID() + randomUUID();
+    await command(process.execPath, ['scripts/database.mjs','init','--maintenance'], { env: { ...process.env, DATA_DIR: dataDir } });
     await command(process.execPath, ['scripts/admin.mjs', username, '--stdin'], { env: { ...process.env, DATA_DIR: dataDir }, input: password + '\n' });
     await start();
     const login = await request('/api/login', { method: 'POST', auth: false, body: { username, password } });

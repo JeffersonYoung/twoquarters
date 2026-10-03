@@ -1,3 +1,5 @@
+> Database deployment policy: application startup only validates the database. Before first installation, explicitly run `DATA_DIR=... npm run db:init` with the app stopped. Existing installations require a reviewed manual migration (`db:migrate`) and backup. Automatic deployments never initialize or migrate databases. See [database release policy](deploy/database-policy.md).
+
 # Twoquarters 自托管版
 
 保留原作品集的视觉和页面；前台支持 HTTP 和 HTTPS 公开访问，生产环境的后台 `/admin` 及管理操作仅允许配置的 HTTPS 地址，使用您自己创建的用户名和密码。后端为 Node 24 + SQLite，图片保存在服务器本地，不再需要 Supabase、Sites 登录、远程图片/CDN、字体服务或第三方 API。依赖包仅在安装/构建时下载，运行时只访问自己的服务器。

@@ -20,11 +20,7 @@ function ensureDiskSpace(additional = 0) {
 }
 const uploadRequests = new Map();
 let uploading = 0, running = false, stopping = false, activeProcess, activeId;
-db.exec(`CREATE TABLE IF NOT EXISTS videos (
- id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL,
- input_type TEXT NOT NULL, source_bytes INTEGER NOT NULL DEFAULT 0, output_bytes INTEGER,
- width INTEGER, height INTEGER, duration REAL, error TEXT, created INTEGER NOT NULL
-); CREATE INDEX IF NOT EXISTS videos_project ON videos(project_id);`);
+
 
 export function projectVideos(p, admin = false) {
  const rows = db.prepare('SELECT * FROM videos WHERE project_id=? ORDER BY created,id').all(p.id);
