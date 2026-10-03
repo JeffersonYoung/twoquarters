@@ -348,20 +348,11 @@ main {
   transition: opacity 300ms ease;
 }
 
+/* Work images keep their complete composition at every breakpoint. */
 .project-card img {
   width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.project-card-2 img,
-.project-card-3 img {
-  aspect-ratio: 4 / 5;
-}
-
-.project-card:hover img {
-  transform: scale(1.025);
+  height: auto;
+  object-fit: contain;
 }
 
 .project-card:hover figure::after {
@@ -641,7 +632,8 @@ main {
 .project-hero > img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .project-hero-overlay {
@@ -765,11 +757,7 @@ main {
 .gallery-shot img {
   width: 100%;
   height: auto;
-  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.gallery-shot button:hover img {
-  transform: scale(1.012);
+  object-fit: contain;
 }
 
 .shot-expand {
@@ -1359,17 +1347,6 @@ main {
     margin: 0 0 62px;
   }
 
-  .project-card img,
-  .project-card-2 img,
-  .project-card-3 img {
-    aspect-ratio: 4 / 3;
-  }
-
-  .project-card-2 img,
-  .project-card-3 img {
-    object-position: center 44%;
-  }
-
   .project-open {
     display: none;
   }
@@ -1493,10 +1470,6 @@ main {
   .project-hero {
     height: 74svh;
     min-height: 590px;
-  }
-
-  .project-hero > img {
-    object-position: 55% center;
   }
 
   .project-back {
@@ -2021,7 +1994,7 @@ main {
 .admin-image-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 30px 0 0 44px; }
 .admin-image-grid article { position: relative; min-width: 0; overflow: hidden; border: 1px solid #d0d3d1; border-radius: 4px; background: #fff; }
 .admin-image-grid figure { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #dfe1df; }
-.admin-image-grid img { width: 100%; height: 100%; object-fit: cover; }
+.admin-image-grid img { width: 100%; height: 100%; object-fit: contain; }
 .image-card-info { display: grid; grid-template-columns: 24px 1fr; gap: 5px; min-height: 58px; padding: 10px; }
 .image-card-info > span { color: #8a8f90; font-size: 0.58rem; }
 .image-card-info p { overflow: hidden; font-size: 0.67rem; text-overflow: ellipsis; white-space: nowrap; }

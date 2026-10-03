@@ -12,7 +12,7 @@ export function ProjectCard({ project, index = 0, loading = index > 1 ? "lazy" :
     <article className={`project-card project-card-${(index % 4) + 1}`}>
       <Link to={`/works/${project.slug}`}>
         <figure>
-          <img {...responsiveImage(project.cover.src, [480, 960], projectCardSizes(index), project.cover.width)} alt={project.cover.alt} loading={loading} decoding="async" />
+          <img {...responsiveImage(project.cover.src, [480, 960], projectCardSizes(index), project.cover.width)} alt={project.cover.alt} width={project.cover.width} height={project.cover.height} loading={loading} decoding="async" />
           <span className="project-open" aria-hidden="true"><ArrowUpRight /></span>
         </figure>
         <div className="project-card-meta">

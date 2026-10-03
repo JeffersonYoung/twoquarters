@@ -295,3 +295,17 @@ test('video-category projects without playable media retain image detail and sin
   assert.ok(markup.includes('<video'));
   assert.ok(!markup.includes('aria-label="选择视频"'));
 });
+
+
+test('portrait, landscape, square and panoramic work cards retain intrinsic dimensions in every slot', () => {
+  const { ProjectCard } = loadSource('components/ProjectCard.tsx');
+  for (const [width, height] of [[900, 1600], [1600, 900], [800, 800], [3000, 400], [400, 3000]]) {
+    for (let index = 0; index < 4; index++) {
+      const fixture = { ...project, cover: { ...project.cover, width, height } };
+      const [img] = imgTags(render(ProjectCard, { project: fixture, index }));
+      assert.equal(attr(img, 'width'), String(width));
+      assert.equal(attr(img, 'height'), String(height));
+      assert.equal(attr(img, 'style'), undefined);
+    }
+  }
+});
