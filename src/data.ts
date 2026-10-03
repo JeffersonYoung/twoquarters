@@ -17,7 +17,7 @@ export type ProjectVideo = {
   name: string;
   status: "uploading" | "queued" | "processing" | "ready" | "failed";
   error?: string;
-  contentType: "video/mp4";
+  contentType: "video/mp4" | "video/webm";
   width?: number;
   height?: number;
   duration?: number;

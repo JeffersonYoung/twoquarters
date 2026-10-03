@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { SCHEMA_VERSION, SCHEMA_V1_SQL } from '../server/schema.mjs';
+import { SCHEMA_VERSION, SCHEMA_V1_SQL, SCHEMA_V2_SQL } from '../server/schema.mjs';
 function cmd(dir,args){return spawnSync(process.execPath,args,{env:{...process.env,DATA_DIR:dir},encoding:'utf8'});}
 const open=dir=>new DatabaseSync(path.join(dir,'portfolio.sqlite'));
 const start=dir=>cmd(dir,['--input-type=module','-e',"import {db} from './server/store.mjs';import './server/video.mjs';db.close()"]);
@@ -25,7 +25,7 @@ function legacyFixture(dir,version) {
  mkdirSync(path.join(dir,'uploads'));
  const db=open(dir);
  try {
-  db.exec(SCHEMA_V1_SQL);db.exec(`PRAGMA user_version=${version}`);
+  db.exec(version === 2 ? SCHEMA_V2_SQL : SCHEMA_V1_SQL);db.exec(`PRAGMA user_version=${version}`);
   db.prepare('INSERT INTO users VALUES(?,?)').run('admin','preserved-password-hash');
   db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run('existing-session','admin','existing-csrf',2000000000000);
   db.prepare('INSERT INTO login_limits VALUES(?,?,?)').run('existing-limit',3,2000000000000);
@@ -44,13 +44,13 @@ function legacyFixture(dir,version) {
 test('startup refuses absent database without creating one',()=>{
  const dir=temp();try{assert.notEqual(start(dir).status,0);assert.equal(existsSync(path.join(dir,'portfolio.sqlite')),false);}finally{rmSync(dir,{recursive:true,force:true});}
 });
-test('explicit initialization creates version 2 with server defaults and refuses existing databases',()=>{
+test('explicit initialization creates version 3 with server defaults and refuses existing databases',()=>{
  const dir=temp();try{
-  assert.equal(SCHEMA_VERSION,2);
+  assert.equal(SCHEMA_VERSION,3);
   const initialized=cmd(dir,['scripts/database.mjs','init','--maintenance']);assert.equal(initialized.status,0,initialized.stderr);
   const db=open(dir);
   try {
-   assert.equal(db.prepare('PRAGMA user_version').get().user_version,2);
+   assert.equal(db.prepare('PRAGMA user_version').get().user_version,3);
    const column=db.prepare('PRAGMA table_info(videos)').all().find(column=>column.name==='compression_mode');
    assert.equal(column.notnull,1);assert.equal(column.dflt_value,"'server'");
   } finally {db.close();}
@@ -61,7 +61,7 @@ test('explicit initialization creates version 2 with server defaults and refuses
   assert.deepEqual(snapshot(dir),before,'initialization refusal and normal startup never alter schema or rows');
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
-for(const version of [0,1])test(`version ${version} startup is read-only; explicit migration preserves users, projects, queued uploads and media`,()=>{
+for(const version of [0,1,2])test(`version ${version} startup is read-only; explicit migration preserves users, projects, queued uploads and media`,()=>{
  const dir=temp();try{
   legacyFixture(dir,version);const before=snapshot(dir);
   const rejected=start(dir);assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/Manual migration required/);
@@ -70,11 +70,11 @@ for(const version of [0,1])test(`version ${version} startup is read-only; explic
   assert.deepEqual(snapshot(dir),before,'startup and refused commands do not repair or migrate old databases');
   const migrated=cmd(dir,['scripts/database.mjs','migrate','--maintenance']);assert.equal(migrated.status,0,migrated.stderr);
   assert.equal(start(dir).status,0);assert.equal(cmd(dir,['scripts/database.mjs','check']).status,0);
-  const after=snapshot(dir);assert.equal(after.version,2);assert.deepEqual(after.media,before.media);
+  const after=snapshot(dir);assert.equal(after.version,3);assert.deepEqual(after.media,before.media);
   for(const table of ['users','sessions','login_limits'])assert.deepEqual(after.rows[table],before.rows[table],`${table} remains unchanged`);
   const expectedProject={...before.rows.projects[0],data:JSON.stringify({...JSON.parse(before.rows.projects[0].data),category:'fmcg'})};
   assert.deepEqual(after.rows.projects,[expectedProject],'all project metadata and media references survive');
-  assert.deepEqual(after.rows.videos,before.rows.videos.map(row=>({...row,compression_mode:'server'})),'existing ready and queued videos retain all fields and get the old server fallback');
+  assert.deepEqual(after.rows.videos,before.rows.videos.map(row=>({...row,compression_mode:'server',output_type:'video/mp4'})),'existing ready and queued videos retain all fields and get the old server fallback');
   assert.equal(cmd(dir,['scripts/database.mjs','migrate','--maintenance']).status,0);
   assert.deepEqual(snapshot(dir),after,'re-running the explicit migration is idempotent');
  }finally{rmSync(dir,{recursive:true,force:true});}
@@ -88,7 +88,7 @@ test('startup and manual migration reject incompatible schema without repairs or
   }finally{rmSync(dir,{recursive:true,force:true});}
  }
 });
-test('mislabeling a version 2 database as legacy is refused rather than guessed or repaired',()=>{
+test('mislabeling a version 3 database as legacy is refused rather than guessed or repaired',()=>{
  const dir=temp();try{
   assert.equal(cmd(dir,['scripts/database.mjs','init','--maintenance']).status,0);
   const db=open(dir);db.exec('PRAGMA user_version=0');db.close();const before=snapshot(dir);
@@ -96,7 +96,7 @@ test('mislabeling a version 2 database as legacy is refused rather than guessed 
   assert.deepEqual(snapshot(dir),before);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
-test('legacy adoption and version 2 migration remain in one rollback transaction',()=>{
+test('legacy adoption and version 3 migration remain in one rollback transaction',()=>{
  const dir=temp();try{
   legacyFixture(dir,0);const db=open(dir);
   db.exec("CREATE TRIGGER refuse_fixture_migration BEFORE UPDATE ON projects BEGIN SELECT RAISE(ABORT,'fixture migration failure'); END");db.close();

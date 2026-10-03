@@ -163,15 +163,44 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
       assert.equal((await stat(output)).mode & 0o077, 0, 'transcoded file is private on disk');
       await assertFiles(v.id, [`video-${v.id}.mp4`]);
     });
-    await t.test('WebM becomes MP4 and retains portrait orientation without upscaling', async () => {
+    await t.test('compliant WebM preserves codecs and packets without encoding', async () => {
+      const logBefore = (await readFile(ffmpegLog,'utf8')).length;
       const v = await accepted(p.id, webm, 'video/webm', 'portrait.webm');
       portrait = await terminal(p.id, v.id);
-      assert.equal(portrait.status, 'ready', portrait.error);
+      assert.equal(portrait.status, 'ready', portrait.error + serverLog);
+      assert.equal(portrait.contentType, 'video/webm');
       assert.equal(portrait.width, 120); assert.equal(portrait.height, 200);
-      const info = JSON.parse(await command('ffprobe', ['-v','error','-show_streams','-of','json',path.join(dataDir,'uploads',`video-${v.id}.mp4`)]));
-      assert.equal(info.streams.find(s => s.codec_type === 'video').codec_name, 'h264');
-      assert.equal(info.streams.find(s => s.codec_type === 'audio').codec_name, 'aac');
-      await assertFiles(v.id, [`video-${v.id}.mp4`]);
+      const output = path.join(dataDir,'uploads',`video-${v.id}.webm`);
+      const hashes = async filename => JSON.parse(await command('ffprobe', ['-v','error','-fflags','+noparse',
+        '-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,data_hash','-of','json',filename])).packets.map(p => [p.stream_index,p.data_hash]);
+      assert.deepEqual(await hashes(output), await hashes(webmPath));
+      const commands = (await readFile(ffmpegLog,'utf8')).slice(logBefore);
+      assert.match(commands, /-c copy/); assert.doesNotMatch(commands, /libx264/);
+      for (const method of ['GET','HEAD']) assert.equal((await request(portrait.src,{method,auth:false})).status,404);
+      const response = await request(portrait.src);
+      assert.equal(response.headers.get('content-type'),'video/webm');
+      await assertFiles(v.id, [`video-${v.id}.webm`]);
+      await stop(); await start();
+      assert.equal((await request(portrait.src)).status,200,'ready WebM survives restart');
+    });
+    await t.test('oversized WebM is normalized to MP4 while truncated WebM is rejected', async () => {
+      const separate = await createProject();
+      try {
+        const input = path.join(fixtureDir,'large.webm');
+        await command('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=2000x1200:rate=12',
+          '-f','lavfi','-i','sine=sample_rate=48000','-t','0.5','-c:v','libvpx-vp9','-threads','2','-deadline','realtime','-c:a','libopus',input]);
+        const v = await accepted(separate.id,await readFile(input),'video/webm','large.webm');
+        const ready = await terminal(separate.id,v.id);
+        assert.equal(ready.status,'ready',ready.error + serverLog); assert.equal(ready.contentType,'video/mp4');
+        assert.ok(ready.width <= 1920 && ready.height <= 1080);
+        const packetInfo = JSON.parse(await command('ffprobe',['-v','error','-fflags','+noparse','-select_streams','v','-show_packets','-show_entries','packet=pos,size','-of','json',webmPath]));
+        const packet = packetInfo.packets[0], corrupt = Buffer.from(webm);
+        corrupt.fill(0xff,Number(packet.pos)+32,Number(packet.pos)+Math.min(Number(packet.size),300));
+        const damaged = await accepted(separate.id,corrupt,'video/webm','damaged.webm');
+        assert.equal((await terminal(separate.id,damaged.id)).status,'failed','corrupt codec payload is rejected'); await assertFiles(damaged.id,[]);
+        const broken = await accepted(separate.id,webm.subarray(0,Math.floor(webm.length*0.65)),'video/webm','broken.webm');
+        assert.equal((await terminal(separate.id,broken.id)).status,'failed'); await assertFiles(broken.id,[]);
+      } finally { await request(`/api/admin/projects/${separate.id}`,{method:'DELETE'}); }
     });
     await t.test('compliant originals and browser output preserve video/audio packets without invoking an encoder', async () => {
       const separate = await createProject(), input = path.join(fixtureDir,'compliant.mp4');
@@ -377,7 +406,13 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
       assert.equal((await request(endpoint + '/images', { method: 'POST', body: form })).status, 200);
       assert.equal((await request(endpoint, { method: 'PATCH', body: { ...details, published: true } })).status, 200);
       const publicProject = (await (await request('/api/projects', { auth: false })).json()).find(item => item.id === p.id);
-      assert.equal(publicProject.videos.length, 2); assert.ok(publicProject.videos.every(v => v.status === 'ready' && !('sourceBytes' in v) && !('error' in v)));
+      assert.equal(publicProject.videos.length, 2);
+      const webmRange = await request(portrait.src,{auth:false,headers:{Range:'bytes=0-15'}});
+      assert.equal(webmRange.status,206); assert.equal(webmRange.headers.get('content-type'),'video/webm');
+      assert.equal((await webmRange.arrayBuffer()).byteLength,16);
+      const webmHead = await request(portrait.src,{auth:false,method:'HEAD'});
+      assert.equal(webmHead.status,200); assert.equal(webmHead.headers.get('content-type'),'video/webm');
+ assert.ok(publicProject.videos.every(v => v.status === 'ready' && !('sourceBytes' in v) && !('error' in v)));
       const full = await request(landscape.src, { auth: false });
       assert.equal(full.status, 200); assert.equal(full.headers.get('content-type'), 'video/mp4');
       assert.equal(full.headers.get('accept-ranges'), 'bytes'); assert.deepEqual(Buffer.from(await full.arrayBuffer()), expected);

@@ -36,6 +36,12 @@ try {
      checkSchema(db,{legacy:true});
      db.exec("ALTER TABLE videos ADD COLUMN compression_mode TEXT NOT NULL DEFAULT 'server'");
      db.exec('PRAGMA user_version=2');
+     version=2;
+    }
+    if(version===2){
+     checkSchema(db,{legacy:true});
+     db.exec("ALTER TABLE videos ADD COLUMN output_type TEXT NOT NULL DEFAULT 'video/mp4'");
+     db.exec('PRAGMA user_version=3');
     }
     checkSchema(db);db.exec('COMMIT');
    } catch(e){db.exec('ROLLBACK');throw e;}

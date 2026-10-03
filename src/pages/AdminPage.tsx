@@ -632,7 +632,7 @@ export function AdminPage() {
               {videoTask.phase === "compressing" && <progress value={videoTask.progress} max={1} aria-label="浏览器压缩进度" />}
               <button type="button" onClick={() => videoAbort.current?.abort()}>取消{videoTask.phase === "compressing" ? "压缩" : "上传"}</button>
             </div>}
-            <p className="video-help">输出 H.264 / AAC MP4，最高 30fps；横屏最高 1920 × 1080，竖屏最高 1080 × 1920，不放大小尺寸视频。服务器会检查所有上传内容，符合格式、尺寸和码率限制的视频仅无损整理封装，不再次有损压缩。原片与临时文件在处理成功或失败后删除。</p>
+            <p className="video-help">浏览器压缩输出 MP4；服务器保留符合要求的 WebM（VP8/VP9 + Opus/Vorbis），其余视频按需转为 H.264 / AAC MP4。最高 30fps；横屏最高 1920 × 1080，竖屏最高 1080 × 1920，不放大小尺寸视频。服务器会检查所有上传内容，符合格式、尺寸和码率限制的视频仅无损整理封装，不再次有损压缩。WebM 播放取决于浏览器的编码支持；需兼容较旧设备时请选择浏览器压缩生成 MP4。原片与临时文件在处理成功或失败后删除。</p>
             <p className="video-help">浏览器模式面向 Windows / macOS 当前版 Chrome，实际检查本机编解码能力；压缩失败或取消时不会自动上传原片，也不会自动切换模式。需手动选择服务器处理后重新选文件。浏览器目标码率最高约 4 Mbps，音频 128 kbps，与服务器 CRF 22 的质量和体积不保证相同。视频最长 10 分钟，输入最高 4K / 120fps；公开页面仅展示处理完成的视频，发布仍需图片封面。<a href="/licenses/mediabunny-NOTICE.txt" target="_blank" rel="noopener noreferrer">压缩组件许可与源码</a></p>
             {videoPollError && pendingVideos && <p className="video-poll-error" role="status">{videoPollError}</p>}
             {selected.videos?.length ? (

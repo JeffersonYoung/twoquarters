@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 // DDL is executed only by the explicit database CLI, never by application startup.
 const BASE_SCHEMA_SQL = `
 CREATE TABLE users(username TEXT PRIMARY KEY,password TEXT NOT NULL);
@@ -15,18 +15,19 @@ const VIDEO_INDEX_SQL = 'CREATE INDEX videos_project ON videos(project_id);';
 export const SCHEMA_V1_SQL = `${BASE_SCHEMA_SQL}
 CREATE TABLE videos (${VIDEO_COLUMNS_SQL}
 ); ${VIDEO_INDEX_SQL}`;
-export const SCHEMA_SQL = `${BASE_SCHEMA_SQL}
+export const SCHEMA_V2_SQL = `${BASE_SCHEMA_SQL}
 CREATE TABLE videos (${VIDEO_COLUMNS_SQL},
  compression_mode TEXT NOT NULL DEFAULT 'server'
 ); ${VIDEO_INDEX_SQL}`;
+export const SCHEMA_SQL = SCHEMA_V2_SQL.replace("compression_mode TEXT NOT NULL DEFAULT 'server'", "compression_mode TEXT NOT NULL DEFAULT 'server', output_type TEXT NOT NULL DEFAULT 'video/mp4'");
 const normalize = sql => sql.toLowerCase().replace(/\s+/g,'').replace(/ifnotexists/g,'');
 export function checkSchema(db, { legacy = false } = {}) {
  db.exec('PRAGMA busy_timeout=5000');
  const version = db.prepare('PRAGMA user_version').get().user_version;
- if (version !== SCHEMA_VERSION && !(legacy && [0,1].includes(version))) throw new Error(`Database version ${version}; expected ${SCHEMA_VERSION}. Manual migration required.`);
+ if (version !== SCHEMA_VERSION && !(legacy && [0,1,2].includes(version))) throw new Error(`Database version ${version}; expected ${SCHEMA_VERSION}. Manual migration required.`);
  const expected = new DatabaseSync(':memory:');
  try {
-  expected.exec(version < 2 ? SCHEMA_V1_SQL : SCHEMA_SQL);
+  expected.exec(version < 2 ? SCHEMA_V1_SQL : version === 2 ? SCHEMA_V2_SQL : SCHEMA_SQL);
   for (const row of expected.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL").all()) {
    const actual=db.prepare('SELECT sql FROM sqlite_master WHERE type=? AND name=?').get(row.type,row.name);
    if (!actual || normalize(actual.sql)!==normalize(row.sql)) throw new Error(`Database schema mismatch: ${row.name}. Manual migration required.`);

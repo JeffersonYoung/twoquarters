@@ -36,7 +36,7 @@ export function projectVideos(p, admin = false) {
  const rows = db.prepare('SELECT * FROM videos WHERE project_id=? ORDER BY created,id').all(p.id);
  return { ...p, videos: rows.filter(v => admin || v.status === 'ready').map(v => ({
   id: v.id, src: '/api/videos/' + v.id, name: v.name, status: v.status,
-  contentType: 'video/mp4', width: v.width, height: v.height, duration: v.duration,
+  contentType: v.output_type, width: v.width, height: v.height, duration: v.duration,
   ...(admin ? { error: v.error, sourceBytes: v.source_bytes, outputBytes: v.output_bytes } : {}),
  })) };
 }
@@ -63,9 +63,13 @@ function command(bin, args, timeout = 30000, consume) {
   });
  });
 }
+// Matroska already supplies framed packets. Avoid the redundant Opus parser,
+// which reports an error on end-of-stream with FFmpeg 8; decoding stays strict.
+const inputFlags = demuxer => demuxer === 'matroska' ? ['-fflags', '+noparse'] : [];
+const outputSuffix = v => v.output_type === 'video/webm' ? 'webm' : 'mp4';
 async function probe(source, demuxer) {
  return JSON.parse(await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',demuxer,
-  '-threads','2','-show_streams','-show_format','-of','json',source]));
+  ...inputFlags(demuxer),'-threads','2','-show_streams','-show_format','-of','json',source]));
 }
 async function inspectBmff(source, size) {
  // ffprobe may tolerate a truncated trailing moov/metadata box. Validate top-level
@@ -120,21 +124,21 @@ async function inspect(id, type, suffix = 'source') {
  }
  return { video, streams, duration, demuxer, size, source, info, mp4 };
 }
-function outputShape(media) {
+function outputShape(media, webm = false) {
  const { video, streams, mp4 } = media;
  const audio = streams.filter(stream => stream.codec_type === 'audio');
  const frameRate = rate(video.avg_frame_rate), nominalRate = rate(video.r_frame_rate);
  const aspect = video.sample_aspect_ratio;
  // An absent SAR uses H.264's square-pixel default; explicit unknown or
  // non-square values are not compliant. Transform matrices,
- // extra tracks and non-MP4 containers go through the server normalization path.
- return mp4 && streams.length === 1 + audio.length && audio.length <= 1 &&
-  video.codec_name === 'h264' && video.pix_fmt === 'yuv420p' && video.width % 2 === 0 && video.height % 2 === 0 &&
+ // extra tracks and unsupported codecs go through server normalization.
+ return (webm ? media.demuxer === 'matroska' : mp4) && streams.length === 1 + audio.length && audio.length <= 1 &&
+  (webm ? ['vp8','vp9'].includes(video.codec_name) : video.codec_name === 'h264') && video.pix_fmt === 'yuv420p' && video.width % 2 === 0 && video.height % 2 === 0 &&
   Math.max(video.width,video.height) <= 1920 && Math.min(video.width,video.height) <= 1080 &&
   (aspect === '1:1' || aspect === undefined) && (!video.field_order || ['progressive','unknown'].includes(video.field_order)) &&
   !video.tags?.rotate && !video.side_data_list?.some(item => item.side_data_type === 'Display Matrix' || item.rotation !== undefined) &&
   frameRate > 0 && frameRate <= 30 && nominalRate > 0 && nominalRate <= 30 &&
-  audio.every(stream => stream.codec_name === 'aac' && ['LC', undefined].includes(stream.profile) && stream.channels <= 2 &&
+  audio.every(stream => (webm ? ['opus','vorbis'].includes(stream.codec_name) : stream.codec_name === 'aac' && ['LC', undefined].includes(stream.profile)) && stream.channels <= 2 &&
    Number(stream.sample_rate) > 0 && Number(stream.sample_rate) <= 48000);
 }
 function withinCopyBitrateLimits(media) {
@@ -157,15 +161,19 @@ async function packetLimits(media) {
    if (!line) continue;
    const values = Object.fromEntries(line.split('|').map(field => field.split('=')));
    const total = totals.get(Number(values.stream_index));
-   const size = Number(values.size), start = Number(values.pts_time), duration = Number(values.duration_time);
-   if (!total || !Number.isSafeInteger(size) || size <= 0 || !Number.isFinite(start) || !Number.isFinite(duration) || duration <= 0 || ++packets > 200000) throw new Error('Invalid media packets');
+   const size = Number(values.size), start = Number(values.pts_time);
+   // Framed WebM audio need not carry packet durations. Its timestamp span is
+   // bounded here; full strict decoding below verifies the actual media duration.
+   const unknownAudioDuration = media.demuxer === 'matroska' && media.streams.find(s => s.index === Number(values.stream_index))?.codec_type === 'audio' && values.duration_time === 'N/A';
+   const duration = unknownAudioDuration ? 0 : Number(values.duration_time);
+   if (!total || !Number.isSafeInteger(size) || size <= 0 || !Number.isFinite(start) || !Number.isFinite(duration) || (duration <= 0 && !unknownAudioDuration) || ++packets > 200000) throw new Error('Invalid media packets');
    total.bytes += size; total.count++;
    total.first = Math.min(total.first,start); total.last = Math.max(total.last,start+duration);
    if (total.bytes > media.size || total.last-total.first > 600.25) throw new Error('Invalid media timeline');
   }
   if (pending.length > 8192) throw new Error('Invalid packet probe');
  };
- await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',media.demuxer,'-threads','2',
+ await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',media.demuxer,...inputFlags(media.demuxer),'-threads','2',
   '-show_packets','-show_entries','packet=stream_index,size,pts_time,duration_time','-of','compact=p=0:nk=0',media.source],30000,consume);
  if (pending.trim()) consume('\n');
  return media.streams.every(stream => {
@@ -176,11 +184,11 @@ async function packetLimits(media) {
    (stream.codec_type !== 'video' || total.count / span <= 30.001);
  });
 }
-async function validateCopy(id, media) {
+async function validateCopy(media) {
  // Remuxing does not decode. Fully decode the bounded output once so corrupt
  // codec payloads cannot reach ready status, but never encode a compliant input.
  const progress = await command('ffmpeg', ['-hide_banner','-loglevel','error','-nostdin','-xerror','-err_detect','explode',
-  '-protocol_whitelist','file','-f','mov','-threads','2','-i',file(id,'partial'),'-map','0:v:0','-map','0:a:0?',
+  '-protocol_whitelist','file','-f',media.demuxer,...inputFlags(media.demuxer),'-threads','2','-i',media.source,'-map','0:v:0','-map','0:a:0?',
   '-threads','2','-filter_threads','1','-progress','pipe:1','-nostats','-f','null','-'],PROCESS_TIMEOUT);
  const times = [...progress.matchAll(/^out_time_us=(\d+)$/gm)].map(match => Number(match[1]) / 1e6);
  const decoded = times.at(-1);
@@ -200,16 +208,17 @@ async function processQueue() {
     const input = await inspect(v.id, v.input_type);
     const { video, duration, demuxer } = input;
     if (!find(v.id) || stopping) continue;
-    const copy = outputShape(input) && withinCopyBitrateLimits(input) && await packetLimits(input);
+    const webm = v.compression_mode === 'server' && v.input_type === 'video/webm';
+    const copy = outputShape(input, webm) && withinCopyBitrateLimits(input) && await packetLimits(input);
     if (!copy && v.compression_mode === 'browser') throw new Error('Browser output does not meet compression requirements');
     if (!find(v.id) || stopping) continue;
     const common = ['-hide_banner','-loglevel','error','-nostdin','-y','-xerror','-protocol_whitelist','file',
-     '-f',demuxer,'-threads','2','-i',file(v.id,'source'),'-map',`0:${video.index}`,'-map','0:a:0?',
+     '-f',demuxer,...inputFlags(demuxer),'-threads','2','-i',file(v.id,'source'),'-map',`0:${video.index}`,'-map','0:a:0?',
      '-map_metadata','-1','-map_chapters','-1','-sn','-dn'];
     if (copy) {
      // Only the container changes: faststart + metadata removal, codec packets
      // preserved for browser output AND already-compliant original uploads.
-     await command('ffmpeg', [...common,'-c','copy','-movflags','+faststart','-f','mp4',file(v.id,'partial')],60000);
+     await command('ffmpeg', [...common,'-c','copy',...(webm ? ['-f','webm'] : ['-movflags','+faststart','-f','mp4']),file(v.id,'partial')],60000);
     } else {
      // Account for pixel aspect ratio; retain orientation; cap long/short edges.
      const factor = 'min(1,min(1920/max(iw*sar,ih),1080/min(iw*sar,ih)))';
@@ -220,17 +229,19 @@ async function processQueue() {
       '-movflags','+faststart','-f','mp4',file(v.id,'partial')],PROCESS_TIMEOUT);
     }
     if (!find(v.id) || stopping) continue;
-    const output = await inspect(v.id,'video/mp4','partial');
+    const outputType = copy && webm ? 'video/webm' : 'video/mp4';
+    const suffix = outputType === 'video/webm' ? 'webm' : 'mp4';
+    const output = await inspect(v.id,outputType,'partial');
     const stream = output.video, size = output.size;
-    if (!outputShape(output) || (copy && !withinCopyBitrateLimits(output)) || output.duration < duration - 0.25) throw new Error('Invalid output');
-    if (copy) await validateCopy(v.id, output);
+    if (!outputShape(output, outputType === 'video/webm') || (copy && !withinCopyBitrateLimits(output)) || output.duration < duration - 0.25) throw new Error('Invalid output');
+    if (copy) await validateCopy(output);
     if (!find(v.id)) continue;
-    await rename(file(v.id,'partial'),file(v.id,'mp4'));
-    if (!find(v.id)) { await remove(file(v.id,'mp4')); continue; }
+    await rename(file(v.id,'partial'),file(v.id,suffix));
+    if (!find(v.id)) { await remove(file(v.id,suffix)); continue; }
     await remove(file(v.id,'source'));
-    db.prepare("UPDATE videos SET status='ready',output_bytes=?,width=?,height=?,duration=?,error=NULL WHERE id=?").run(size,stream.width,stream.height,output.duration,v.id);
+    db.prepare("UPDATE videos SET status='ready',output_bytes=?,width=?,height=?,duration=?,output_type=?,error=NULL WHERE id=?").run(size,stream.width,stream.height,output.duration,outputType,v.id);
    } catch (error) {
-    await Promise.all(['source','partial','mp4'].map(s=>remove(file(v.id,s))));
+    await Promise.all(['source','partial','mp4','webm'].map(s=>remove(file(v.id,s))));
     if (!stopping) db.prepare("UPDATE videos SET status='failed',error=? WHERE id=?").run(v.compression_mode === 'browser'
      ? '浏览器压缩结果不符合要求或文件损坏；临时文件已清理。请重新压缩，或选择服务器压缩后重新上传。'
      : '视频处理失败；临时原片已清理，请重新上传有效 MP4 / MOV / WebM（最长 10 分钟、最高 4K / 120fps），或检查服务器 FFmpeg 与磁盘空间。',v.id);
@@ -239,7 +250,7 @@ async function processQueue() {
     activeId = undefined;
     await remove(file(v.id,'partial'));
     await remove(file(v.id,'source'));
-    if (!find(v.id)) { await remove(file(v.id,'source')); await remove(file(v.id,'mp4')); }
+    if (!find(v.id)) { await remove(file(v.id,'source')); await remove(file(v.id,'mp4')); await remove(file(v.id,'webm')); }
    }
   }
  } finally { running = false; }
@@ -248,9 +259,9 @@ export async function startVideoQueue() {
  // A crash interrupts uploads/encodes. Discard temporary originals rather than silently retaining them.
  db.prepare("UPDATE videos SET status='failed',error=? WHERE status IN ('uploading','processing')").run('处理被服务器重启中断；临时原片已清理，请重新上传。');
  for (const name of await readdir(path.join(dataDir,'uploads'))) {
-  const match = /^video-([a-f0-9-]{36})\.(source|partial|mp4)$/.exec(name); if (!match) continue;
+  const match = /^video-([a-f0-9-]{36})\.(source|partial|mp4|webm)$/.exec(name); if (!match) continue;
   const v = find(match[1]);
-  const keep = v && ((match[2] === 'source' && v.status === 'queued') || (match[2] === 'mp4' && v.status === 'ready'));
+  const keep = v && ((match[2] === 'source' && v.status === 'queued') || (match[2] === outputSuffix(v) && v.status === 'ready'));
   if (!keep) await remove(path.join(dataDir,'uploads',name));
  }
  void processQueue();
@@ -297,7 +308,7 @@ export async function deleteVideo(projectId, id) {
  uploadRequests.get(id)?.destroy();
  if (activeId === id) activeProcess?.kill('SIGKILL');
  // A running process may still hold a file handle; the worker performs a final cleanup too.
- await Promise.all(['source','mp4','partial'].map(s=>remove(file(id,s))));
+ await Promise.all(['source','mp4','webm','partial'].map(s=>remove(file(id,s))));
 }
 export async function deleteProjectVideos(projectId) {
  for (const v of db.prepare('SELECT id FROM videos WHERE project_id=?').all(projectId)) await deleteVideo(projectId,v.id);
@@ -305,7 +316,7 @@ export async function deleteProjectVideos(projectId) {
 export async function serveVideo(req,res,id,admin) {
  const v = find(id), p = v && db.prepare('SELECT published FROM projects WHERE id=?').get(v.project_id);
  if (!v || v.status !== 'ready' || !p || (!admin && !p.published)) fail('视频不存在',404);
- let size; try { size = (await stat(file(id,'mp4'))).size; } catch { fail('视频不存在',404); }
+ let size; try { size = (await stat(file(id,outputSuffix(v)))).size; } catch { fail('视频不存在',404); }
  let start=0,end=size-1,status=200;
  const range = req.headers.range;
  if (range) {
@@ -316,8 +327,8 @@ export async function serveVideo(req,res,id,admin) {
   if (!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=size||end<start) { res.setHeader('Content-Range',`bytes */${size}`); fail('Invalid range',416); }
   status=206; res.setHeader('Content-Range',`bytes ${start}-${end}/${size}`);
  }
- res.writeHead(status,{'Content-Type':'video/mp4','Content-Length':end-start+1,'Accept-Ranges':'bytes'});
+ res.writeHead(status,{'Content-Type':v.output_type,'Content-Length':end-start+1,'Accept-Ranges':'bytes'});
  if(req.method==='HEAD') return res.end();
- const stream=createReadStream(file(id,'mp4'),{start,end});
+ const stream=createReadStream(file(id,outputSuffix(v)),{start,end});
  res.on('close',()=>stream.destroy()); stream.on('error',()=>res.destroy()); stream.pipe(res);
 }
