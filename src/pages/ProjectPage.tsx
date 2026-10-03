@@ -22,12 +22,13 @@ export function ProjectPage() {
 
   const project = projects[projectIndex];
   const videos = playableVideos(project);
+  const isVideoProject = project.category === "video" || videos.length > 0;
   const previous = projects[(projectIndex - 1 + projects.length) % projects.length];
   const next = projects[(projectIndex + 1) % projects.length];
 
   return (
-    <main className={`project-page${videos.length ? " project-watch-page" : ""}`}>
-      {videos.length ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
+    <main className={`project-page${isVideoProject ? " project-watch-page" : ""}`}>
+      {isVideoProject ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
         <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt={project.cover.alt} width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
         <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
@@ -44,14 +45,14 @@ export function ProjectPage() {
           <div><span>类别</span><strong>{categoryLabels[project.category]}</strong></div>
           <div><span>服务</span><strong>{project.discipline}</strong></div>
         </div>
-        {videos.length ? <p className="project-summary">{project.summary}</p> : <Reveal>
+        {isVideoProject ? <p className="project-summary">{project.summary}</p> : <Reveal>
           <p className="project-summary">{project.summary}</p>
         </Reveal>}
       </section>
 
-      {videos.length > 0 && project.credits && <section className="project-credit"><span>Credits</span><p>{project.credits}</p></section>}
+      {isVideoProject && project.credits && <section className="project-credit"><span>Credits</span><p>{project.credits}</p></section>}
 
-      <section className={`project-gallery gallery-${project.category}`}>
+      {!isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
           <Reveal key={image.src} className={`gallery-shot gallery-shot-${(index % 5) + 1}`}>
             <button type="button" onClick={() => setLightboxIndex(index)} aria-label={`查看大图：${image.alt}`}>
@@ -61,9 +62,9 @@ export function ProjectPage() {
             {image.credit && <p>{image.credit}</p>}
           </Reveal>
         ))}
-      </section>
+      </section>}
 
-      {!videos.length && <section className="project-credit">
+      {!isVideoProject && <section className="project-credit">
         <span>Credits</span>
         <p>{project.credits}</p>
       </section>}
@@ -79,7 +80,7 @@ export function ProjectPage() {
         </Link>
       </nav>
 
-      {lightboxIndex !== null && (
+      {!isVideoProject && lightboxIndex !== null && (
         <Lightbox
           images={project.images}
           index={lightboxIndex}

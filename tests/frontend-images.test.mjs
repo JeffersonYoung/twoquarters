@@ -243,7 +243,7 @@ test('video cards keep the canonical direct project URL and existing responsive 
   assert.ok(!markup.includes('<video'));
 });
 
-test('ready videos open above title, introduction, credits and lazy supplemental images in any category', () => {
+test('ready videos show player and introduction without ordinary images in any category', () => {
   for (const category of ['automotive', 'cg-ai', 'fmcg', 'video', 'bts']) {
     const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category } });
     const markup = render(ProjectPage);
@@ -251,13 +251,18 @@ test('ready videos open above title, introduction, credits and lazy supplemental
     assert.equal((markup.match(/<video /g) || []).length, 1);
     assert.ok(markup.indexOf('<video') < markup.indexOf('<h1'));
     assert.ok(markup.indexOf('<h1') < markup.indexOf('Introduction'));
-    assert.ok(markup.indexOf('Production team') < markup.indexOf('class="project-gallery'));
+    assert.ok(markup.includes('Production team'));
+    assert.ok(!markup.includes('project-gallery'));
+    assert.ok(!markup.includes('查看大图'));
+    assert.ok(!markup.includes('role="dialog"'));
+    assert.equal(imgTags(markup).length, 0);
+    assert.ok(markup.includes(`poster="${watchProject.cover.src}?width=960"`));
+    assert.ok(markup.includes('href="/works"'));
     assert.ok(markup.includes(`src="${videos[0].src}"`));
     assert.ok(markup.includes('controls=""') && markup.includes('playsinline=""'));
     assert.ok(markup.includes('preload="metadata"'));
     assert.ok(!/autoplay/i.test(markup));
     assert.ok(markup.includes('aria-label="选择视频"'));
-    assert.ok(imgTags(markup).every(img => attr(img, 'loading') === 'lazy'));
   }
 });
 
@@ -287,13 +292,42 @@ test('watch selection only admits ready canonical media from the supplied public
   assert.deepEqual(helper.playableVideos({ ...project, videos: undefined }), []);
 });
 
-test('video-category projects without playable media retain image detail and single videos need no selector', () => {
-  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category: 'video', videos: [{ ...videos[0], status: 'processing' }] } });
-  assert.ok(render(ProjectPage).includes('class="project-hero"'));
-  const { ProjectPage: Single } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, videos: [videos[0]], images: [] } });
-  const markup = render(Single);
+test('video-category projects without playable media never fall back to ordinary images', () => {
+  for (const candidates of [[], undefined, ...['uploading', 'queued', 'processing', 'failed'].map(status => [{ ...videos[0], status }])]) {
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category: 'video', videos: candidates } });
+    const markup = render(ProjectPage);
+    assert.ok(markup.includes('暂无可播放视频。'));
+    assert.ok(markup.includes('Introduction'));
+    assert.ok(markup.includes('Production team'));
+    assert.ok(markup.includes('href="/works"'));
+    assert.ok(!markup.includes('class="project-hero"'));
+    assert.ok(!markup.includes('project-gallery'));
+    assert.ok(!markup.includes('<video'));
+    assert.ok(!markup.includes('aria-label="选择视频"'));
+    assert.equal(imgTags(markup).length, 0);
+  }
+});
+
+test('single videos need no selector and stored images are left intact', () => {
+  const fixture = { ...watchProject, videos: [videos[0]], images: [...images] };
+  const before = JSON.stringify(fixture);
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture });
+  const markup = render(ProjectPage);
   assert.ok(markup.includes('<video'));
   assert.ok(!markup.includes('aria-label="选择视频"'));
+  assert.equal(imgTags(markup).length, 0);
+  assert.equal(JSON.stringify(fixture), before);
+});
+
+test('image-only projects in non-video categories preserve their hero and gallery', () => {
+  for (const category of ['automotive', 'cg-ai', 'fmcg', 'bts']) {
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...project, category } });
+    const markup = render(ProjectPage);
+    assert.ok(markup.includes('class="project-hero"'));
+    assert.ok(markup.includes('project-gallery'));
+    assert.equal(imgTags(markup).length, images.length + 1);
+    assert.ok(!markup.includes('project-watch-page'));
+  }
 });
 
 

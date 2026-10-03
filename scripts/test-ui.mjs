@@ -188,12 +188,17 @@ try {
   await publicPage.locator('.watch-player').waitFor();
   assert.equal((await fetch(origin + videoSrc)).status, 200);
   await publicPage.waitForFunction(() => document.querySelector('.watch-player')?.readyState >= 1);
-  await publicPage.locator('.project-gallery button').first().click();
-  await publicPage.getByRole('dialog').waitFor();
-  await publicPage.keyboard.press('Escape');
+  const noVideoGallery = async () => {
+    assert.equal(await publicPage.locator('.project-hero, .project-gallery, .lightbox, .project-page img').count(), 0);
+  };
+  await noVideoGallery();
   // Index opens directly to the player, not a cover/intro stage.
   await publicPage.goto(`${origin}/works`);
-  await publicPage.locator(`.project-card a[href="/works/${slug}"]`).click();
+  const videoCard = publicPage.locator(`.project-card a[href="/works/${slug}"]`);
+  await videoCard.waitFor();
+  assert.equal(await videoCard.locator('img').count(), 1);
+  assert.equal(await videoCard.locator('video').count(), 0);
+  await videoCard.click();
   await publicPage.locator('.watch-player').waitFor();
   assert.equal(await publicPage.locator('.project-hero').count(), 0);
   assert.equal(await publicPage.locator('video').count(), 1);
@@ -224,8 +229,10 @@ try {
   await publicPage.locator('.watch-selection a').first().click();
   assert.equal(new URL(publicPage.url()).searchParams.get('video'), firstId);
   await publicPage.goBack();
+  await noVideoGallery();
   assert.equal(await publicPage.locator('video').getAttribute('src'), secondSrc);
   await publicPage.goForward();
+  await noVideoGallery();
   assert.equal(await publicPage.locator('video').getAttribute('src'), videoSrc);
   await publicPage.goto(`${origin}/works/${slug}?video=${secondId}`);
   await publicPage.locator('.watch-selection [aria-current="true"]').waitFor();
@@ -238,6 +245,18 @@ try {
   await publicPage.goto(`${origin}/works/${slug}?video=..%2Fprivate`);
   await publicPage.locator('video').waitFor();
   assert.equal(await publicPage.locator('video').getAttribute('src'), videoSrc);
+  // A video-category project with no ready media must not expose stored photos.
+  watchProject.category = 'video';
+  watchProject.videos = [];
+  await publicPage.goto(`${origin}/works/${slug}`);
+  await publicPage.getByRole('status').filter({ hasText: '暂无可播放视频。' }).waitFor();
+  await noVideoGallery();
+  assert.equal(await publicPage.locator('video').count(), 0);
+  await publicPage.locator('.watch-back').click();
+  await publicPage.locator(`.project-card a[href="/works/${slug}"] img`).waitFor();
+  await publicPage.goBack();
+  await publicPage.getByRole('status').filter({ hasText: '暂无可播放视频。' }).waitFor();
+  await noVideoGallery();
   await publicPage.close();
 
   if (artifacts) {

@@ -27,7 +27,8 @@ export function ProjectWatch({ project, videos }: { project: Project; videos: Pr
   return (
     <section className="project-watch" aria-label="项目视频">
       <Link className="watch-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
-      <Player key={video.id} video={video} poster={imageVariant(project.cover.src, 960)} />
+      {video ? <Player key={video.id} video={video} poster={imageVariant(project.cover.src, 960)} />
+        : <p className="watch-error" role="status">暂无可播放视频。</p>}
       <div className="watch-heading">
         <h1>{project.title}</h1>
         {project.titleEn && <p>{project.titleEn}</p>}
