@@ -1,14 +1,15 @@
 # Twoquarters 自托管版
 
-保留原作品集的视觉和页面；前台公开访问，后台 `/admin` 使用您自己创建的用户名和密码。后端为 Node 24 + SQLite，图片保存在服务器本地，不再需要 Supabase、Sites 登录、远程图片/CDN、字体服务或第三方 API。依赖包仅在安装/构建时下载，运行时只访问自己的服务器。
+保留原作品集的视觉和页面；前台支持 HTTP 和 HTTPS 公开访问，生产环境的后台 `/admin` 及管理操作仅允许配置的 HTTPS 地址，使用您自己创建的用户名和密码。后端为 Node 24 + SQLite，图片保存在服务器本地，不再需要 Supabase、Sites 登录、远程图片/CDN、字体服务或第三方 API。依赖包仅在安装/构建时下载，运行时只访问自己的服务器。
 
 ## 内容范围
 
-- 导入代码仓库里的 6 个示例项目和图片；没有迁移线上数据库或私人数据
+- 随包提供代码仓库里的 6 个示例项目和图片，仅在手动执行可选初始化命令时导入；没有迁移线上数据库或私人数据
 - 原仓库、此前 Sites 版本没有改动
 - 项目图片通过权限校验接口读取；草稿图片和管理接口不能匿名访问
 - 首页主视觉和 About 页背景是公开装饰图，即使相关示例项目下线，这两张装饰图仍会保留
-- 首次启动仅导入一次；重启不会重新导入已删除的示例项目
+- 全新数据库正常启动后项目为空；启动或重启从不自动导入示例，也不会重新导入已删除的示例
+- 正常启动及手动示例初始化均不创建 `settings` 表，不读取或写入 seed 标记；已有旧表保持不变
 
 ## 本地启动
 
@@ -19,19 +20,79 @@
     npm run admin:init -- your-admin-name
     APP_ORIGIN=http://localhost:3000 npm start
 
-打开 `http://localhost:3000`，后台为 `/admin`。初始化时在终端隐藏输入至少 14 个字符的独立密码；没有默认生产密码。不要把密码写进命令行、代码、环境变量或聊天。数据默认保存在 `data/`。
+打开 `http://localhost:3000`，后台为 `/admin`。全新安装没有项目，公开作品页显示空状态；后台可点击“新建项目”添加第一个作品。管理员初始化时在终端隐藏输入 14–1024 个字符的独立密码；没有默认生产密码。不要把密码写进命令行、代码、环境变量或聊天。数据默认保存在 `data/`；自定义时，管理员初始化、示例初始化和服务启动必须使用同一个 `DATA_DIR`。
 
 ## 服务器部署（Docker Compose）
 
 1. 把本目录上传到服务器；安装官方 Docker Engine 和 Compose
-2. 复制 `.env.example` 为 `.env`，把 `APP_ORIGIN` 改成真实 HTTPS 域名，如 `https://your-domain.com`
+2. 复制 `.env.example` 为 `.env`，把 `APP_ORIGIN` 改成精确的**后台 HTTPS origin**，如 `https://your-domain.com`，不含路径或末尾斜杠；先保留 `TRUSTED_PROXY_IPS` 为空，确认实际代理来源 IP 后再配置，此时前台可访问、后台默认拒绝访问
 3. 执行 `docker compose build`
-4. 执行 `docker compose run --rm portfolio node scripts/admin.mjs your-admin-name`，在您自己的终端设置密码
-5. 执行 `docker compose up -d`
-6. 使用现有 HTTPS 反向代理转发到 `127.0.0.1:3000`；Nginx 路由示例在 `deploy/nginx.conf.example`
-7. 检查公开页面、登录、上传草稿、发布/下线和匿名访问权限
+4. 执行 `docker compose run --rm --no-deps portfolio node scripts/admin.mjs your-admin-name`，在您自己的终端隐藏输入密码；管理员初始化不导入示例
+5. 可选：如需仓库示例，在服务停止、项目和视频记录及上传目录均为空时，执行 `docker compose run --rm --no-deps portfolio npm run samples:init`，使用同一持久数据卷；如需空作品集，跳过此步
+6. 执行 `docker compose up -d`
+7. 将 HTTP 和 HTTPS 两个站点配置均反向代理到 `127.0.0.1:3000`；使用 `deploy/nginx.conf.example`，HTTPS 配置有效证书，前台 HTTP 不强制跳转、不添加 HSTS；代理必须用真实 `$scheme` 覆盖 `X-Forwarded-Proto`
+8. 按下节方法确认应用实际看到的代理连接 IP，在 `.env` 设置 `TRUSTED_PROXY_IPS`，再执行 `docker compose up -d --force-recreate portfolio`；不要猜测 Docker 网关地址
+9. 分别检查 HTTP/HTTPS 公开页面；通过精确的 `APP_ORIGIN` 打开 `/admin`，检查登录、上传草稿、发布/下线和匿名访问权限。HTTP `/admin` 应拒绝访问，HTTP `/api/session` 应显示匿名；未导入示例时，作品页为空属于正常状态
 
-生产模式要求 HTTPS。容器以非 root 用户运行，3000 端口仅绑定回环地址。数据保存在持久卷中；更新代码时保留该卷。**不要执行 `docker compose down -v`，否则会删除数据卷。** TLS 证书、域名与已有服务需要按服务器实际配置处理，本包不会覆盖它们。
+生产模式要求后台使用 HTTPS，前台仍可使用 HTTP。容器以非 root 用户运行，3000 端口仅绑定回环地址。数据保存在持久卷中；更新代码时保留该卷。**不要执行 `docker compose down -v`，否则会删除数据卷。** TLS 证书、域名与已有服务需要按服务器实际配置处理，本包不会覆盖它们。
+
+## 前台 HTTP 与仅 HTTPS 管理
+
+生产环境的 `APP_ORIGIN` 仍须为精确的 HTTPS 地址，用于后台认证和管理；公开页面、公开只读接口及已发布媒体可通过 HTTP 或 HTTPS 访问。HTTP 内容不加密。应用不发送 HSTS，也不将前台 HTTP 自动跳转到 HTTPS。
+
+生产环境的 `/admin*`、管理接口、登录/退出及所有写操作，必须经过可信的 HTTPS，并且请求 Host 与 `APP_ORIGIN` 完全一致（含非默认端口）。会话 cookie 使用 Secure、HttpOnly 和 SameSite=Strict。即使手动把会话 cookie 重放到 HTTP，请求也按匿名处理：`/api/session` 返回 `admin: false`，草稿图片/视频仍不可访问。HTTP 登录或管理请求会被拒绝，不会带着密码重定向；远程 HTTP 页面通过前端路由进入后台时，会显示“需要 HTTPS”的提示并隐藏密码表单，登录客户端也会在发送凭据前拒绝提交。请直接打开准确的 HTTPS 后台地址。本地开发示例允许回环 HTTP，生产环境不得使用开发模式；生产服务即使面对回环连接也没有 HTTP 管理例外。
+
+HTTPS 由反向代理终止。`TRUSTED_PROXY_IPS` 只接受逗号分隔的**精确 IP 地址**，匹配应用 TCP 连接实际看到的代理来源；不接受 CIDR 网段、主机名或任意转发链。默认空值会拒绝代理后的生产后台访问。代理必须用实际连接协议覆盖用户传入的 `X-Forwarded-Proto`，即 `proxy_set_header X-Forwarded-Proto $scheme;`；HTTP/HTTPS 共用配置不得硬编码 `https`，也不得原样转发客户端提供的值。后端端口仅限回环或受保护的私有网络，不得让不可信客户端直接访问；仅有转发头不能证明连接安全。
+
+宿主机 Nginx 直接连接宿主机 Node 回环端口时，可设置 `TRUSTED_PROXY_IPS=127.0.0.1,::1`。经 Docker 发布端口进入容器时，应用看到的实际来源可能不同；**不要猜测桥接网关，也不要信任整个子网**。保持 allowlist 为空并启动服务，通过真实代理发起前台 HTTP 请求；在服务器上使用已安装的 Docker、`nsenter` 和 `ss` 检查应用容器网络命名空间中的连接：
+
+    container_pid=$(docker inspect --format '{{.State.Pid}}' "$(docker compose ps -q portfolio)")
+    sudo nsenter --target "$container_pid" --net ss -tn '( sport = :3000 )'
+
+从真实代理连接的 **Peer Address:Port** 列读取 IP（不含端口）。若连接太短而未看到，发起请求时再检查，不要从空结果猜测。只把确认过的代理 IP 写入 `.env`，使用部署时相同的 Compose 配置重新创建服务，然后验证 HTTPS 登录。无法确认来源时保持 allowlist 为空，先解决网络配置；代理或容器网络变更后再次检查。
+
+在 Nginx 的 80 和 443 两个 server 块使用同一代理 location，不对前台 HTTP 强制跳转，也不添加 HSTS。检查已有代理/CDN 是否独立添加了跳转或 HSTS。浏览器中旧 HSTS 缓存、预加载规则或父域 `includeSubDomains` 策略仍可能强制 HTTPS，需等待相应策略过期或在可行时清除；修改应用不会清除它们。本次代码更新没有修改任何已有服务器部署、证书或代理配置。
+
+## 可选：手动导入示例
+
+可以完全跳过此步骤，直接创建自己的作品。`admin:init` 仅管理管理员账号，`samples:init` 仅导入 6 个仓库示例项目及图片，两者相互独立。
+
+裸 Node：先停止所有使用同一数据目录的应用进程，再执行，最后启动服务：
+
+    npm run samples:init
+    APP_ORIGIN=http://localhost:3000 npm start
+
+如有自定义 `DATA_DIR`，请在两条命令中均设置同一路径，并与管理员初始化保持一致；否则会使用默认的 `./data`。
+
+Docker：先构建更新后的镜像，导入时保持服务停止，再启动：
+
+    docker compose stop portfolio
+    docker compose run --rm --no-deps portfolio npm run samples:init
+    docker compose up -d
+
+使用部署时相同的 Compose 项目、数据卷、环境变量和附加配置文件。导入期间不要让另一应用实例或第二个初始化进程访问该数据目录。
+
+**只要已有任何项目、任何视频记录，或 uploads 目录含任何条目，命令就拒绝导入**；即使项目及上传目录为空，孤立视频记录也会阻止导入。不会覆盖或合并内容。因此成功后再次执行会被拒绝；删除项目后重启服务也不会自动导入。普通导入失败会回滚本次数据库变更，并清理本次创建的文件，清理成功后可安全重试；请先检查错误信息。进程突然终止或断电可能留下孤立文件，因为 SQLite 和文件系统无法组成同一个原子事务。此时先停止应用、备份完整数据目录，再人工检查并决定是否清理；初始化命令不会自动删除未知或孤立文件，上传目录非空时仍会拒绝。
+
+## 旧 `settings` 表：可选人工清理
+
+升级后的数据库可能保留旧示例导入标记。应用不会创建、读取、写入或自动删除该 `settings` 表；保留它不影响使用，也不会触发导入。此次代码更新**没有清理或修改任何生产数据库**。
+
+确需删除旧表时，先停止所有使用该库的应用进程，完整备份数据目录（含 SQLite/WAL 和 uploads），并验证备份。随后使用 SQLite 工具检查真实表结构和全部记录：
+
+    SELECT type, name, sql FROM sqlite_schema WHERE tbl_name = 'settings';
+    PRAGMA table_info(settings);
+    SELECT key, value FROM settings;
+
+仅当表结构确认为旧版 `settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)`、没有未知索引/触发器或其他用途，且表内为空或只有唯一一条 `key = 'seed'`、`value = 'repository-only-v1'` 的记录时，才可继续。如果存在任何未知设置、结构差异或不确定之处，**保持原表不动**。表不存在则无需处理。完成上述检查和备份后，可选择在事务中删除：
+
+    BEGIN IMMEDIATE;
+    DROP TABLE settings;
+    COMMIT;
+
+重新启动后检查作品及管理员登录。这只是人工维护选项，不是必需迁移，也不是初始化步骤。
+
+## 密码重置
 
 忘记密码时，在同一数据卷上执行：
 
@@ -50,7 +111,7 @@
     docker compose run --rm --no-deps -T portfolio tar czf - -C /app/data . > backups/portfolio-data.tar.gz
     docker compose start portfolio
 
-恢复到新的空数据卷，不要覆盖运行中的数据库；保留旧卷回滚，恢复文件归属为 UID/GID 1000。完整恢复说明见 `README.md`。后台删除会移除本地记录/上传文件，恢复需要备份。
+恢复到新的空数据卷，不要覆盖运行中的数据库；保留旧卷回滚，恢复文件归属为 UID/GID 1000。完整恢复说明见 `README.md`。恢复不需要执行 `samples:init`，也不依赖 seed 标记；数据库及 uploads 中的恢复内容即为数据来源，启动不会添加示例。后台删除会移除本地记录/上传文件，恢复需要备份。
 
 ## 已验证与限制
 

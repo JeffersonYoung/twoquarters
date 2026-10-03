@@ -1,10 +1,10 @@
 # Twoquarters · self-hosted portfolio
 
-A standalone migration of the original portfolio UI. React/Vite frontend, Node 24 HTTP server, SQLite metadata and local image/video files. No Supabase, Sites, external authentication, remote image host, CDN, analytics or font service is used at runtime. Public visitors can browse without login. `/admin` uses an owner-created username/password.
+A standalone migration of the original portfolio UI. React/Vite frontend, Node 24 HTTP server, SQLite metadata and local image/video files. No Supabase, Sites, external authentication, remote image host, CDN, analytics or font service is used at runtime. Public visitors can browse without login over HTTP or HTTPS. In production, `/admin` and all management operations require the configured HTTPS origin and use an owner-created username/password.
 
 Source repository: https://github.com/JeffersonYoung/JeffersonYoung.github.io (original checkout commit `d38724ca15c4194eb7cd768e47d1fc857d27a0de`).
 
-Only the six repository sample projects and their repository images are imported. No live database or private user data has been copied. Existing original/Sites checkouts are unchanged.
+The six repository sample projects and their repository images are included as an **optional manual import**. Normal startup never imports them. No live database or private user data has been copied. Existing original/Sites checkouts are unchanged.
 
 ## Local run
 
@@ -15,9 +15,9 @@ Requires Node **24.x** (native `node:sqlite`), npm, and local **FFmpeg/ffprobe**
     npm run admin:init -- your-admin-name
     APP_ORIGIN=http://localhost:3000 npm start
 
-Open `http://localhost:3000` and `/admin`. The password prompt is hidden and requires 14–1024 characters. No preset username/password or production secret is included. Do not put passwords in shell commands, environment variables, source control or messages. `--stdin` is available for a secure password-manager pipe; command-line password arguments are not supported.
+Open `http://localhost:3000` and `/admin`. A fresh installation has no projects: the public portfolio shows its empty state, and admin offers **新建项目** to create the first project. The password prompt is hidden and requires 14–1024 characters. No preset username/password or production secret is included. Do not put passwords in shell commands, environment variables, source control or messages. `--stdin` is available for a secure password-manager pipe; command-line password arguments are not supported.
 
-The default bind is loopback. `DATA_DIR` defaults to `./data`, containing `portfolio.sqlite`, its WAL files, and `uploads/`. A first start imports sample projects exactly once; deleting samples and restarting does not reimport them. Sample project images are copied into protected local storage. The home hero and About-page background also exist as public site decoration, independently of project publication; unpublishing a project does not remove those two decorative copies. All project images are served through authorization-checked routes, and unpublished project metadata and uploads are inaccessible to anonymous users.
+The default bind is loopback. `DATA_DIR` defaults to `./data`, containing `portfolio.sqlite`, its WAL files, and `uploads/`. Normal startup creates the required application tables with an empty projects collection on a fresh database; it never imports samples. Neither startup nor manual sample initialization creates a `settings` table or reads/writes a seed marker. If you choose the optional import below, sample project images are copied into protected local storage. The home hero and About-page background also exist as public site decoration, independently of project publication; unpublishing a project does not remove those two decorative copies. All project images are served through authorization-checked routes, and unpublished project metadata and uploads are inaccessible to anonymous users.
 
 For frontend development, run the API as above plus `npm run dev`; Vite proxies `/api` to port 3000. Set `APP_ORIGIN` to the exact Vite URL while doing admin development. Production uses the single built server, not Vite preview.
 
@@ -25,16 +25,74 @@ For frontend development, run the API as above plus `npm run dev`; Vite proxies 
 
 1. Copy this folder/archive to the server. No GitHub push is required.
 2. Install Docker Engine + Compose from their official distribution instructions if needed.
-3. Copy `.env.example` to `.env`; set `APP_ORIGIN` to your real exact HTTPS origin.
+3. Copy `.env.example` to `.env`; set `APP_ORIGIN` to your exact **admin HTTPS origin** (for example, `https://portfolio.example.com`, without a path or trailing slash). Leave `TRUSTED_PROXY_IPS` empty until you verify the proxy socket peer as described below; public browsing works, but production admin access is denied until it is configured.
 4. Run `docker compose build`.
-5. Run `docker compose run --rm portfolio node scripts/admin.mjs your-admin-name` and enter a unique password locally in the terminal. This initializes the persistent volume; it does not expose an account-creation endpoint.
-6. Run `docker compose up -d`.
-7. Route your existing HTTPS reverse proxy to `127.0.0.1:3000`. An Nginx location example is included under `deploy/`. Configure your own valid TLS certificate and redirect HTTP to HTTPS. The application refuses production mode with an HTTP origin, and uses Secure cookies under HTTPS.
-8. Check `docker compose ps`, visit the public site, log into `/admin`, upload a temporary draft, publish/unpublish it, then remove it. Confirm an anonymous browser cannot access a draft image.
+5. Run `docker compose run --rm --no-deps portfolio node scripts/admin.mjs your-admin-name` and enter a unique password locally in the terminal. This creates the admin separately from content; it does not import samples or expose an account-creation endpoint.
+6. Optional, only if you want the repository samples: while the service is stopped and the projects, video records and uploads directory are empty, run `docker compose run --rm --no-deps portfolio npm run samples:init`. This uses the same persistent data volume. See the safeguards below; otherwise skip this step for an empty portfolio.
+7. Run `docker compose up -d`.
+8. Route **both HTTP and HTTPS** server blocks through your reverse proxy to `127.0.0.1:3000`, using `deploy/nginx.conf.example`. Configure your valid TLS certificate for HTTPS. Do not redirect public HTTP to HTTPS or add HSTS; see the transport requirements below. The proxy must overwrite `X-Forwarded-Proto` with its actual `$scheme`.
+9. Verify the proxy’s exact backend socket peer IP, set `TRUSTED_PROXY_IPS` in `.env`, and run `docker compose up -d --force-recreate portfolio` to apply it. Follow the Docker discovery procedure below rather than guessing the bridge gateway.
+10. Check `docker compose ps` and visit the public site over **both** schemes (an empty portfolio is expected if you skipped the optional import). Open `/admin` through the exact `APP_ORIGIN`, log in, upload a temporary draft, publish/unpublish it, then remove it. Verify HTTP `/admin` is denied, HTTP `/api/session` reports anonymous, and an anonymous browser cannot access draft images/videos.
 
 Container port 3000 is bound only to server loopback. The app runs as the unprivileged `node` user, with a read-only root filesystem and a persistent data volume. Preserve that volume on upgrades. **Never run `docker compose down -v` unless you intentionally want to destroy all content and account data.** Docker image pulls and certificate issuance/renewal require network access; app/page operation uses only your server. The server uses the locally installed Sharp image decoder and FFmpeg/ffprobe video tools; there are no remote API or runtime service dependencies.
 
-If installing without Docker, build under Node 24, run as a dedicated non-root OS user, place DATA_DIR in a private writable directory, set `NODE_ENV=production`, `APP_ORIGIN=https://your-domain`, and put the loopback listener behind the same TLS reverse proxy. Use your normal system service manager for restart-on-failure.
+If installing without Docker, build under Node 24, run as a dedicated non-root OS user, place DATA_DIR in a private writable directory, set `NODE_ENV=production`, `APP_ORIGIN=https://your-domain`, and put the loopback listener behind the same HTTP/HTTPS reverse proxy. When host Nginx connects directly to host Node over loopback, set `TRUSTED_PROXY_IPS=127.0.0.1,::1`. Use your normal system service manager for restart-on-failure.
+
+## Public HTTP and HTTPS-only administration
+
+Production `APP_ORIGIN` is still an exact HTTPS origin for **administration**, not a requirement that public visitors use HTTPS. Public pages, public read APIs and published media can use HTTP or HTTPS. HTTP content is unencrypted. The app emits no HSTS header and does not redirect public HTTP requests.
+
+Production `/admin*`, admin APIs, login/logout and all state-changing requests require verified HTTPS with the request Host exactly matching `APP_ORIGIN` (including any non-default port). Session cookies are Secure, HttpOnly and SameSite=Strict. An HTTP request is treated as anonymous even if a session cookie is manually replayed: `/api/session` reports `admin: false`, and draft media remains inaccessible. Login/management requests sent over HTTP are rejected, not redirected with their credentials. On remote HTTP pages, client-side navigation to admin shows an HTTPS-required notice instead of a password form; the login client also rejects submission before sending credentials. Always open the exact HTTPS admin URL yourself. The local development commands above intentionally permit loopback HTTP; do not use development mode for production.
+
+TLS terminates at your reverse proxy. `TRUSTED_PROXY_IPS` is a comma-separated allowlist of **exact IP addresses** for the proxy as seen by the application's TCP socket; it accepts no CIDRs, hostnames or arbitrary forwarding chains. Its default is empty, which denies proxied production admin access. The proxy must replace client-supplied `X-Forwarded-Proto` with the actual connection scheme, as in `proxy_set_header X-Forwarded-Proto $scheme;`. Never hardcode `https` in a location shared by HTTP and HTTPS, and never pass through a client-supplied value. Keep the backend port loopback-only/private and inaccessible to untrusted clients; the header alone is not proof of TLS.
+
+For host Nginx → host Node over loopback, the peer is `127.0.0.1` or `::1`. For host Nginx → the Docker-published loopback port, Docker's network translation can expose a different peer inside the container. **Do not copy a presumed bridge gateway or trust a whole subnet.** With the service running and `TRUSTED_PROXY_IPS` still empty, send public HTTP requests through the real proxy. On the server, use the installed Docker, `nsenter` and `ss` tools to inspect connections in the app container’s network namespace:
+
+    container_pid=$(docker inspect --format '{{.State.Pid}}' "$(docker compose ps -q portfolio)")
+    sudo nsenter --target "$container_pid" --net ss -tn '( sport = :3000 )'
+
+Read the **Peer Address:Port** column for the real proxy's connection, and record only its IP address. Repeat the inspection while making requests if no active connection is visible; do not infer an address from an empty result. Configure only verified proxy IPs in `.env`, then recreate the service using the same Compose files and verify HTTPS login. If you cannot identify the peer confidently, leave the allowlist empty and resolve the network configuration before enabling admin access. Recheck it after proxy/network changes.
+
+Configure the shared Nginx location in both port-80 and port-443 server blocks, without an HTTP-to-HTTPS redirect or HSTS on this host. Existing reverse proxies/CDNs may add either independently; check them too. A browser's cached HSTS policy, a preload entry, or a parent domain's `includeSubDomains` policy can still force HTTPS until that policy expires or is cleared where possible; changing this app cannot undo it. No existing server, TLS certificate or deployment has been changed by this code update.
+
+## Optional manual sample initialization
+
+Skip this step to start with your own content. Admin account initialization and sample initialization are independent: `admin:init` only manages the admin account, and `samples:init` only imports the six bundled projects and their images.
+
+For local Node, stop every application process using this data directory, then run the following **before** starting the app again:
+
+    npm run samples:init
+    APP_ORIGIN=http://localhost:3000 npm start
+
+If you use a custom data directory, set the **same `DATA_DIR`** for `admin:init`, `samples:init`, and `npm start`; otherwise the command targets the default `./data` directory.
+
+For Docker, build the updated image first and keep the service stopped during initialization:
+
+    docker compose stop portfolio
+    docker compose run --rm --no-deps portfolio npm run samples:init
+    docker compose up -d
+
+Use the same Compose project, volume, environment and overrides as your deployment. Do not run another application instance or a second initializer against that data directory during the import.
+
+The initializer refuses to proceed if **any project or video record exists, or the uploads directory contains any entry**. This includes orphaned video records even if projects and uploads are empty. It does not overwrite or merge content. A second run after a successful import therefore refuses; deleting projects and restarting the server never imports them again. An ordinary import failure rolls back its database changes and cleans up files created by that attempt, allowing a retry once that cleanup succeeds. Check the reported failure before retrying. Abrupt termination or power loss can leave orphan files because SQLite and filesystem changes cannot be one atomic transaction. In that case, stop the app, back up the complete data directory and manually inspect it before any cleanup; the initializer does not automatically delete unknown or orphan files and will refuse a nonempty uploads directory.
+
+## Existing legacy `settings` table (optional manual cleanup)
+
+Upgraded databases may still contain the old sample-import marker in `settings`. The application leaves that table unchanged: it does not create it, use its marker, or automatically delete it. Keeping the table is harmless and does not cause sample imports. **No production database has been modified as part of this change.**
+
+If you deliberately want to remove the legacy table, first stop all application processes using the database and make a complete, verified backup of the data directory, including SQLite/WAL and uploads. Use a SQLite tool to inspect the actual schema and all rows before making changes:
+
+    SELECT type, name, sql FROM sqlite_schema WHERE tbl_name = 'settings';
+    PRAGMA table_info(settings);
+    SELECT key, value FROM settings;
+
+Proceed only if this is exclusively the known legacy schema `settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)`, with no unfamiliar indexes/triggers or other use, and its rows are either empty or exactly the single pair `key = 'seed'`, `value = 'repository-only-v1'`. If there are any unknown settings, schema differences or doubts, **leave the table untouched**. If the table is absent, there is nothing to remove. Only after that inspection and backup, optional removal is:
+
+    BEGIN IMMEDIATE;
+    DROP TABLE settings;
+    COMMIT;
+
+Restart the application and verify your projects and admin login. This is a manual maintenance option, not a required migration or an initialization step.
 
 ## Password reset and access
 
@@ -42,7 +100,7 @@ If installing without Docker, build under Node 24, run as a dedicated non-root O
 
 For a non-Docker install, use `npm run admin:init -- your-admin-name --reset` with the same DATA_DIR. Resetting revokes all sessions. There is no public signup, email reset, external identity provider or stored cleartext password. Passwords use salted scrypt; sessions expire after eight hours, are stored hashed in SQLite and use HttpOnly + SameSite=Strict cookies. State-changing requests require exact Origin and a session CSRF token. Login throttling is persisted by account and socket IP. Behind the provided reverse proxy the IP limit is intentionally shared across visitors; forwarded client-IP headers are not trusted.
 
-Keep the server and Node patched, use HTTPS, restrict SSH access and protect backups. Auth does not protect against a compromised server/root user. This is a single-owner/single-server app, not a multi-tenant CMS. Concurrent editors use last-saved metadata; simultaneous work should be coordinated.
+Keep the server and Node patched, use HTTPS for administration, restrict SSH access and protect backups. Auth does not protect against a compromised server/root user. This is a single-owner/single-server app, not a multi-tenant CMS. Concurrent editors use last-saved metadata; simultaneous work should be coordinated.
 
 ## Back up and restore
 
@@ -59,7 +117,7 @@ Docker backup (run in this project directory):
 
 Do not start a second application instance during backup. The command runs as the normal unprivileged service user, and the host writes the archive under a restrictive umask. Verify the archive with `tar tzf backups/portfolio-data.tar.gz` and test restore on an isolated host/volume.
 
-Restore into an **empty new volume or private staging directory**, not over a running database. Stop the application, preserve the current volume as rollback, copy the archive into the new volume, extract under `/app/data`, and ensure UID/GID 1000 owns the restored files. Point Compose at the restored volume, start the app and verify project counts/images and admin login. Reset the admin password after recovery to revoke backed-up sessions. For bare Node, stop the process, archive the complete DATA_DIR with `tar`, and restore to an empty directory owned by the service user.
+Restore into an **empty new volume or private staging directory**, not over a running database. Stop the application, preserve the current volume as rollback, copy the archive into the new volume, extract under `/app/data`, and ensure UID/GID 1000 owns the restored files. Point Compose at the restored volume, start the app and verify project counts/images and admin login. Restoring does not require `samples:init` or any seed marker: the restored database and uploads are the content source, and startup does not add sample projects. Reset the admin password after recovery to revoke backed-up sessions. For bare Node, stop the process, archive the complete DATA_DIR with `tar`, and restore to an empty directory owned by the service user.
 
 Uploads are decoded and re-encoded locally, stripping metadata and rejecting malformed images and excessive dimensions/frame counts. Uploaded images removed through admin are deleted from disk. Project deletion permanently removes that project's metadata/uploads from the active store; use backups for recovery. Bundled sample image files are never removed from the application.
 

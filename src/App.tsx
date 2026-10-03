@@ -1,3 +1,4 @@
+import { adminTransportAllowed } from "./lib/projects";
 import { useEffect } from "react";
 import { useProjects } from "./ProjectsContext";
 import { Footer } from "./components/Footer";
@@ -28,6 +29,7 @@ export function App() {
   const { error, refresh } = useProjects();
 
   if (location.pathname.startsWith("/admin")) {
+    if (!adminTransportAllowed()) return <main className="portfolio-error" role="alert">请使用已配置的 HTTPS 管理地址登录。公开页面仍可通过 HTTP 浏览。</main>;
     return location.pathname === "/admin" ? <AdminPage /> : <Navigate to="/admin" replace />;
   }
 

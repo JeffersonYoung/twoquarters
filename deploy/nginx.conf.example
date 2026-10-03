@@ -1,15 +1,20 @@
-# Put into your existing HTTPS server block after configuring your real domain and certificate.
-# APP_ORIGIN must exactly match the browser's https://hostname[:port].
+# Include these locations in BOTH your HTTP (:80) and HTTPS (:443) server blocks.
+# Configure the real domain/certificate separately; do not redirect the public HTTP
+# server to HTTPS and do not add HSTS (including at a CDN or parent domain).
+# APP_ORIGIN is the exact HTTPS admin origin; public pages use either scheme.
+# TRUSTED_PROXY_IPS must list this proxy's exact backend socket peer address.
 client_max_body_size 250m;
 client_body_timeout 600s;
 location / {
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Host $http_host;
+    # Overwrite client input. Never hardcode https in a shared HTTP/HTTPS block.
+    proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 600s;
     proxy_send_timeout 600s;
-    # Stream uploads directly; avoid a second temporary original in proxy storage.
     proxy_request_buffering off;
 }
-# Do not expose port 3000 publicly or proxy arbitrary third-party origins here.
+# Backend port must remain loopback-only/firewalled from untrusted clients.
+# A trusted proxy must never relay client-supplied X-Forwarded-Proto unchanged.
+# The app denies HTTP admin/login/mutations; it does not redirect credential bodies.

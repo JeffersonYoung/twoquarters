@@ -16,6 +16,8 @@ const env = { ...process.env, NODE_ENV: 'test', DATA_DIR: directory, SITE_CONFIG
 const password = randomBytes(24).toString('hex');
 const runFixture = (script, input) => execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: root, env, input, stdio: ['pipe', 'pipe', 'pipe'] });
 runFixture(`import {hashPassword} from './server/auth.mjs'; import {db} from './server/store.mjs'; let password=''; for await(const chunk of process.stdin) password+=chunk; db.prepare('INSERT INTO users VALUES(?,?)').run('ui-test',await hashPassword(password)); db.close();`, password);
+// Browser scenarios opt into their repository fixtures; normal startup is empty.
+execFileSync(process.execPath, ['scripts/init-samples.mjs'], { cwd: root, env });
 await writeFile(env.SITE_CONFIG_FILE, JSON.stringify({
   secret: 'not-public',
   filing: { icp: { number: '测试 ICP（非真实备案）', url: 'https://example.com/icp' }, publicSecurity: { number: '测试公安（非真实备案）', url: 'https://example.com/police' }, other: [{ label: '<script>literal text</script>' }, { label: '' }] },

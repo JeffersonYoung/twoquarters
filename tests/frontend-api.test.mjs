@@ -15,6 +15,26 @@ test('frontend API session, mutation, and recovery contract', async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
 
+  await t.test('blocks remote HTTP credentials before fetch while preserving local development', async () => {
+    const client = await freshClient();
+    const originalWindow = globalThis.window;
+    try {
+      globalThis.window = { location: { protocol: 'http:', hostname: 'portfolio.example.test' } };
+      globalThis.fetch = async () => { throw new Error('Credentials must never reach fetch over public HTTP'); };
+      assert.equal(client.adminTransportAllowed(), false);
+      await assert.rejects(client.login('admin', 'password'), error => error.status === 403);
+      for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+        globalThis.window.location.hostname = hostname;
+        assert.equal(client.adminTransportAllowed(), true);
+      }
+      globalThis.window.location = { protocol: 'https:', hostname: 'portfolio.example.test' };
+      assert.equal(client.adminTransportAllowed(), true);
+    } finally {
+      if (originalWindow === undefined) delete globalThis.window;
+      else globalThis.window = originalWindow;
+    }
+  });
+
   await t.test('requires an authenticated anti-CSRF token before mutations', async () => {
     const client = await freshClient();
     globalThis.fetch = async () => { throw new Error('Unauthenticated mutation must not reach fetch'); };

@@ -5,7 +5,8 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN to the exact public HTTPS origin in .env}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN to the exact admin HTTPS origin in .env}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

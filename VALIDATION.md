@@ -77,3 +77,32 @@ Browser suite was retried, but Chromium still failed before opening a page (`soc
 - Browser script now covers desktop/mobile footer, Chinese/English accessibility labels, HTML-as-text, empty/error configuration and existing regressions. Chromium failed before opening a page with `socket() failed: Operation not permitted`, including the permitted elevated retry; **no browser assertions, screenshots or visual QA passed**
 - Optional Docker bind configuration and permissions reviewed statically only; Docker/Compose CLI remains unavailable
 - No database schema changes, actual filing numbers/social accounts, production credentials, deployment or GitHub push for this change
+
+## Manual sample initialization — 2026-10-03
+
+- Startup no longer imports repository samples; new databases have no `settings` table or replacement seed-marker table
+- Optional `npm run samples:init` / Docker deployment command imports six samples explicitly; Docker image includes the CLI, and admin hidden-password setup remains independent
+- Isolated tests cover repeated empty startup, an explicit successful import, duplicate/nonempty refusal, preservation of an existing admin, and deleting all samples followed by repeated empty startup
+- Existing custom project metadata/media and legacy `settings` rows survive the upgrade; the separately approved fashion → fmcg migration still preserves all other fields
+- Partial import failures from missing source files and duplicate inserts roll back rows and remove attempt-owned files; retry succeeds. Existing uploads and orphan video records cause a safe refusal
+- Concurrent initializer regression confirms one success/one refusal, six project rows, and no extra upload files
+- SQLite and filesystem writes are not crash-atomic: abrupt termination/power loss can leave orphan files. The documented recovery requires a stopped app, complete backup and manual inspection; unknown files/settings are never automatically deleted by the initializer
+- Existing API/browser fixture setup now explicitly imports sample content instead of depending on server startup
+- Browser suite retried after updating fixtures; Chromium still aborts before opening a page with `socket() failed: Operation not permitted`. No browser assertions, screenshots, or visual QA are claimed
+- No production database, credentials, server configuration or deployment changed; optional legacy-table cleanup is documentation only
+
+## Public HTTP access with HTTPS-only administration
+
+- Public pages, site configuration, published project lists, published images and videos return 200 over ordinary HTTP and trusted-proxy HTTPS, without app-generated redirects or HSTS.
+- In production, HTTP admin pages, login/logout and mutations are denied before handling credentials. HTTP session reads are anonymous; manually replaying an admin cookie does not expose draft images or videos.
+- HTTPS proxy trust is opt-in through exact `TRUSTED_PROXY_IPS` socket peers. Integration tests reject a spoofed HTTPS header from `127.0.0.2` when only `127.0.0.1` is trusted, reject combined protocol values and wrong Host, and verify Secure login cookies.
+- Same-origin CSRF checks remain in place. Public HTTP Origin cannot submit HTTPS admin login.
+- The client hides the remote-HTTP admin form behind an HTTPS-required notice and rejects login before fetch; localhost HTTP remains available for development. Production server enforcement has no localhost bypass.
+- Targeted verification: `node --test tests/transport.test.mjs tests/frontend-api.test.mjs` passed 10 tests, and `npm run build` passed. This validates application behavior locally; no real proxy, TLS certificate, firewall or remote server was configured or changed.
+
+## Final combined validation — manual samples and public HTTP
+
+- `npm run build`, `npm run lint`, and syntax checks for all server/scripts/tests `.mjs` files passed
+- Final `npm test`: **40/40 passed**, including six sample-initialization scenarios, production transport and browser-fetch credential guards, and all existing video/storage/footer/auth/image regressions
+- Final `npm run test:ui` retry remains blocked before any page/assertion by Chromium process-socket permission failure; no visual or actual browser playback QA passed
+- Docker/Compose and real TLS/reverse-proxy deployment were not executed; no live server configuration or production data was changed

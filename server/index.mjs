@@ -1,3 +1,4 @@
+import { transportPolicy } from './transport.mjs';
 import { loadSiteConfig } from './site-config.mjs';
 import { storageOverview } from './storage.mjs';
 import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
@@ -6,15 +7,15 @@ import http from 'node:http';
 import { readFile, writeFile, unlink, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { db, root, dataDir, seed } from './store.mjs';
+import { db, root, dataDir } from './store.mjs';
 import { session, rateLimit, randomToken, hashToken, verifyPassword } from './auth.mjs';
 const port=Number(process.env.PORT||3000),host=process.env.HOST||'127.0.0.1';
 const origin=new URL(process.env.APP_ORIGIN||`http://localhost:${port}`).origin;
 if(process.env.NODE_ENV==='production'&&!origin.startsWith('https://')) throw new Error('Production requires APP_ORIGIN=https://your-domain');
 const secure=origin.startsWith('https://');
+const trustedHTTPS=transportPolicy(origin,process.env.TRUSTED_PROXY_IPS);
 const cookie=(value,maxAge)=>`tq_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
 const siteConfig = await loadSiteConfig();
-seed();
 await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const json=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
@@ -38,9 +39,13 @@ let pendingLogins=0;
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
- if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
+ // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
- const current=session(req);
+ const adminTransport=!secure||trustedHTTPS(req);
+ let decodedRoute;try{decodedRoute=decodeURIComponent(route);}catch{fail('Bad path');}
+ if(!adminTransport&&(decodedRoute.startsWith('/admin')||route.startsWith('/api/admin/')||route==='/api/login'||route==='/api/logout'||!['GET','HEAD'].includes(method)))fail('管理操作必须通过配置的 HTTPS 地址访问',403);
+ // An HTTP visitor never gains draft/session privileges, even with a replayed cookie.
+ const current=adminTransport?session(req):null;
  if(route.startsWith('/api/')){
   if(!['GET','HEAD'].includes(method)){
    if(req.headers.origin!==origin)fail('请从本站提交操作',403);
@@ -136,7 +141,7 @@ async function handle(req,res){
 }
 const server=http.createServer((req,res)=>{handle(req,res).catch(e=>{if(!res.headersSent)json(res,{error:e.status?e.message:'服务暂时不可用，请稍后重试'},e.status||500);else res.end();if(!e.status)console.error(e);});});
 server.requestTimeout=10*60_000;server.headersTimeout=15_000;server.maxRequestsPerSocket=100;
-server.listen(port,host,()=>console.log(`Twoquarters listening on ${host}:${port}; origin ${origin}`));
+server.listen(port,host,()=>console.log(`Twoquarters listening on ${host}:${server.address().port}; origin ${origin}`));
 for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{
  const stopped=stopVideoQueue();
  server.close(async()=>{await stopped;db.close();process.exit(0);});

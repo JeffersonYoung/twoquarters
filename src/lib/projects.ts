@@ -58,7 +58,13 @@ export async function getSession() {
   const session = await api<AdminSession>("/session");
   return version === sessionVersion ? acceptSession(session) : session;
 }
+// Local HTTP is for development only; production transport is enforced again by the server.
+export function adminTransportAllowed() {
+  return typeof window === "undefined" || window.location.protocol === "https:" ||
+    ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+}
 export async function login(username: string, password: string) {
+  if (!adminTransportAllowed()) throw new ApiError("请使用已配置的 HTTPS 管理地址登录", 403);
   const version = ++sessionVersion;
   const session = await api<AdminSession>("/login", "POST", { username, password });
   return version === sessionVersion ? acceptSession(session) : session;
