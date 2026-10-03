@@ -1,3 +1,5 @@
+import { storageOverview } from './storage.mjs';
+import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
 import sharp from 'sharp';
 import http from 'node:http';
 import { readFile, writeFile, unlink, stat } from 'node:fs/promises';
@@ -11,6 +13,7 @@ if(process.env.NODE_ENV==='production'&&!origin.startsWith('https://')) throw ne
 const secure=origin.startsWith('https://');
 const cookie=(value,maxAge)=>`tq_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
 seed();
+await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const json=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
 async function body(req,max=64*1024){
@@ -25,14 +28,14 @@ function draft(value){
  const d={};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000})){
   if(value[key]!=null&&typeof value[key]!=='string')fail('文字资料格式不正确');d[key]=(value[key]||'').trim();if(d[key].length>max)fail('文字过长');
  }
- if(!d.title||!['automotive','fashion','bts'].includes(d.category))fail('请填写标题和有效分类');d.published=value.published===true;return d;
+ if(!d.title||!['automotive','cg-ai','fmcg','video','bts'].includes(d.category))fail('请填写标题和有效分类');d.published=value.published===true;return d;
 }
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.woff2':'font/woff2','.ico':'image/x-icon'};
 async function sendFile(req,res,file,type){let bytes;try{bytes=await readFile(file);}catch{fail('Not found',404);}res.writeHead(200,{'Content-Type':type||mime[path.extname(file)]||'application/octet-stream','Content-Length':bytes.length});res.end(req.method==='HEAD'?undefined:bytes);}
 let pendingLogins=0;
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
- res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
  if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
  const current=session(req);
@@ -59,9 +62,23 @@ async function handle(req,res){
   }
   if(route==='/api/logout'&&method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(current.token);res.setHeader('Set-Cookie',cookie('',0));return json(res,{ok:true});}
   if(route.startsWith('/api/admin/')&&!current)fail('请先登录',401);
+  if(route==='/api/admin/storage'&&method==='GET') {
+   const activeJobs=db.prepare("SELECT count(*) AS n FROM videos WHERE status IN ('uploading','queued','processing')").get().n;
+   return json(res,await storageOverview(dataDir,activeJobs));
+  }
   if((route==='/api/projects'||route==='/api/admin/projects')&&method==='GET'){
    const rows=db.prepare('SELECT data FROM projects'+(route==='/api/projects'?' WHERE published=1':'')+' ORDER BY sort_order,rowid DESC').all();
-   return json(res,rows.map(r=>JSON.parse(r.data)).filter(p=>route!=='/api/projects'||p.cover));
+   return json(res,rows.map(r=>projectVideos(JSON.parse(r.data),route==='/api/admin/projects')).filter(p=>route!=='/api/projects'||p.cover));
+  }
+  if(route.startsWith('/api/videos/')&&(method==='GET'||method==='HEAD')) {
+   const id=route.slice(12); if(!/^[a-f0-9-]{36}$/.test(id))fail('视频不存在',404);
+   return serveVideo(req,res,id,!!current);
+  }
+  const videoRoute=route.match(/^\/api\/admin\/projects\/([^/]+)\/videos(?:\/([^/]+))?$/);
+  if(videoRoute) {
+   const [,pid,vid]=videoRoute; getProject(pid);
+   if(!vid&&method==='POST') { await uploadVideo(req,pid); return json(res,projectVideos(getProject(pid),true),202); }
+   if(vid&&method==='DELETE') { await deleteVideo(pid,vid); return json(res,projectVideos(getProject(pid),true)); }
   }
   if(route.startsWith('/api/images/')&&(method==='GET'||method==='HEAD')){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
@@ -77,8 +94,8 @@ async function handle(req,res){
   const match=route.match(/^\/api\/admin\/projects\/([^/]+)(?:\/(cover|images)(?:\/([^/]+))?)?$/);
   if(match){
    const [,id,action,imageId]=match;
-   if(!action&&method==='PATCH'){const d=draft(await input(req)),p=getProject(id);if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
-   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);for(const im of p.images)if(im.storagePath)await unlink(path.join(dataDir,'uploads',im.id)).catch(()=>{});return json(res,{ok:true});}
+   if(!action&&method==='PATCH'){const p=getProject(id),d=draft(await input(req));if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
+   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await unlink(path.join(dataDir,'uploads',im.id)).catch(()=>{});return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
    if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await unlink(path.join(dataDir,'uploads',im.id)).catch(()=>{});return json(res,p);}
    if(action==='images'&&!imageId&&method==='POST'){
@@ -115,6 +132,10 @@ async function handle(req,res){
  return sendFile(req,res,path.join(client,'index.html'));
 }
 const server=http.createServer((req,res)=>{handle(req,res).catch(e=>{if(!res.headersSent)json(res,{error:e.status?e.message:'服务暂时不可用，请稍后重试'},e.status||500);else res.end();if(!e.status)console.error(e);});});
-server.requestTimeout=30_000;server.headersTimeout=15_000;server.maxRequestsPerSocket=100;
+server.requestTimeout=10*60_000;server.headersTimeout=15_000;server.maxRequestsPerSocket=100;
 server.listen(port,host,()=>console.log(`Twoquarters listening on ${host}:${port}; origin ${origin}`));
-for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>{db.close();process.exit(0);}));
+for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{
+ const stopped=stopVideoQueue();
+ server.close(async()=>{await stopped;db.close();process.exit(0);});
+ server.closeAllConnections();
+});

@@ -36,3 +36,31 @@ The review also checked cookie/session design, protected image access, data-dire
 ## Run on the target before opening access
 
 Build/start, initialize the real administrator locally, configure exact HTTPS APP_ORIGIN and reverse proxy, then verify the public homepage/works/detail routes and run the included browser suite on a supported host. Test a private draft upload in a separate anonymous session, publish/unpublish it, and test an isolated backup restore. Keep only one app instance writing the same SQLite/uploads directory.
+
+## Video feature validation — 2026-10-03
+
+- Final `npm run build` and `npm run lint`: passed
+- Final `npm test`: **23/23 passed**, including 15 real-video integration scenarios (Node 24.19.0, FFmpeg/ffprobe 7.1.5)
+- MP4 encoding verified H.264 video/AAC audio, 1920×1080 landscape output, smaller output for the high-bitrate fixture, private file permissions, and faststart `moov` before `mdat`
+- WebM converted to MP4 with portrait dimensions preserved and no upscaling; MOV display-matrix rotation produced correctly oriented pixels without retained rotation metadata
+- Invalid type, empty body, malformed name, oversized declared body, malformed/truncated containers, excessive dimensions/duration/fps rejected or safely failed
+- Originals and partials deleted on success/failure; failed jobs require a new upload
+- Anonymous draft access denied for GET/HEAD/Range; published full, prefix/suffix/open-ended ranges, invalid ranges, unpublish and deleted access checked
+- CSRF/Origin/admin authorization checked; deletion is project-scoped
+- Maximum two concurrent uploads and eight queued/active jobs checked; aborted bodies and deletion during active upload clean originals
+- SIGTERM during active encode waited for cleanup before exit; restart cleaned interrupted/orphan source/output files, preserved ready output and continued complete queued uploads
+- Frontend API tests cover raw video request body, encoded filename, MIME, CSRF and deletion; browser script now includes video upload/preview, draft preservation, privacy, published metadata loading and deletion flows
+- Independent static review found two cancellation/shutdown races; both were fixed and covered by added regression tests
+
+Browser suite was retried, but Chromium still failed before opening a page (`socket() failed: Operation not permitted`). New UI/browser assertions are included but **not executed**; no visual or actual browser playback QA is claimed. Docker/Compose remains unavailable: the FFmpeg package installation, 2 CPU / 2 GiB limits and Nginx changes are statically reviewed only. FFmpeg 5 compatibility is designed into the encoding flags and MOV test fixture, but this workspace executed FFmpeg 7 only. No production credentials/content/server changes or GitHub publication were performed for this feature.
+
+## Storage overview and category validation — 2026-10-03
+
+- Final TypeScript/Vite build and ESLint: passed
+- `npm test`: **26/26 passed**, including all 15 real-FFmpeg video scenarios
+- Authenticated storage endpoint returns no-store samples; anonymous requests are denied, no host paths exposed, total = used + process-available + reserved, and video admission estimates match shared reserve constants
+- Storage unit tests cover BigInt arithmetic, invalid/oversized counters, sparse allocation, hard-link deduplication, symbolic links, nested entries, bounded scans and unavailable paths; unavailable managed-file scans return null
+- Same-origin frontend API storage request, abort forwarding and error propagation passed
+- All five exact category values accepted for new projects; old fashion creation rejected; an old persisted fashion record migrated on startup to fmcg with images intact and readable
+- Browser script includes exact public/admin category order, storage display, refresh failure/recovery and unsaved-draft preservation; **not executed** because Chromium again aborted before opening a page with `socket() failed: Operation not permitted`
+- No visual QA or deployment claimed; prior Docker/Compose and production-access limitations still apply

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdtemp, rm, stat, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -12,19 +12,39 @@ async function start(){child=spawn(process.execPath,['server/index.mjs'],{cwd,en
 async function stop(){if(!child)return;const p=new Promise(resolve=>child.once('exit',resolve));child.kill('SIGTERM');await p;child=null;}
 async function req(route,{method='GET',body,auth=false,token=true,from=origin}={}){const headers={};if(method!=='GET')headers.Origin=from;if(auth){headers.Cookie=cookie;if(token)headers['X-CSRF-Token']=csrf;}if(body&&!(body instanceof FormData))headers['Content-Type']='application/json';return fetch(origin+route,{method,headers,body:body?body instanceof FormData?body:JSON.stringify(body):undefined});}
 async function json(route,opts){const res=await req(route,opts);return [res,await res.json()];}
-const details={title:'Test draft',titleEn:'Test draft',category:'fashion',year:'2026',discipline:'Photo',summary:'A test',credits:'Test',published:false};
+const details={title:'Test draft',titleEn:'Test draft',category:'fmcg',year:'2026',discipline:'Photo',summary:'A test',credits:'Test',published:false};
 test('self-contained auth, CRUD, uploads, privacy, and restart persistence',async()=>{
  dir=await mkdtemp(path.join(tmpdir(),'tq-api-'));
  try{
   const init=spawn(process.execPath,['scripts/admin.mjs','test-admin','--stdin'],{cwd,env:{...process.env,DATA_DIR:dir},stdio:['pipe','pipe','pipe']});init.stdin.end('Test-only-local-password-2026\n');assert.equal(await new Promise(r=>init.on('exit',r)),0);
+  // Simulate an existing installation using the retired fashion category.
+  execFileSync(process.execPath,['--input-type=module','-e',`import {db,seed} from './server/store.mjs';seed();db.exec("UPDATE projects SET data=json_set(data,'$.category','fashion') WHERE json_extract(data,'$.category')='fmcg'");db.close();`],{cwd,env:{...process.env,DATA_DIR:dir}});
   await start();
   assert.equal((await stat(dir)).mode&0o777,0o700);assert.equal((await stat(path.join(dir,'portfolio.sqlite'))).mode&0o777,0o600);
   let [r,list]=await json('/api/projects');assert.equal(r.status,200);assert.equal(list.length,6);assert.equal((await req(list[0].cover.src)).status,200);
   assert.equal((await req('/api/admin/projects')).status,401);
+  assert.equal((await req('/api/admin/storage')).status,401);
   assert.equal((await req('/api/admin/projects',{method:'POST',body:details})).status,401);
   assert.equal((await req('/api/login',{method:'POST',body:{username:'test-admin',password:'wrong'}})).status,401);
   assert.equal((await req('/api/login',{method:'POST',from:'https://evil.example',body:{username:'test-admin',password:'Test-only-local-password-2026'}})).status,403);
   let session;[r,session]=await json('/api/login',{method:'POST',body:{username:'test-admin',password:'Test-only-local-password-2026'}});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];csrf=session.csrfToken;assert.match(r.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
+  const [storageResponse,storage]=await json('/api/admin/storage',{auth:true});
+  assert.equal(storageResponse.status,200);assert.equal(storageResponse.headers.get('cache-control'),'no-store');
+  assert.equal(storage.filesystem.totalBytes,storage.filesystem.usedBytes+storage.filesystem.availableBytes+storage.filesystem.reservedBytes);
+  assert.ok(storage.filesystem.totalBytes>0);assert.ok(storage.managedFiles.allocatedBytes>0);
+  assert.equal(storage.video.requiredBytes,1024**3+500*1024**2);
+  assert.equal(storage.video.hasSpaceForNextUpload,storage.video.availableBytes>=storage.video.requiredBytes);
+  assert.equal(JSON.stringify(storage).includes(dir),false);
+  assert.equal((await req('/api/admin/projects',{method:'POST',body:{...details,category:'fashion'},auth:true})).status,400);
+  const migrated=list.find(p=>p.slug==='chroma-objects');
+  assert.equal(migrated.category,'fmcg');assert.ok(migrated.images.length>0);
+  assert.equal((await req(migrated.cover.src)).status,200);
+  assert.equal((await req('/api/admin/projects/'+migrated.id,{method:'PATCH',body:migrated,auth:true})).status,200);
+  for(const category of ['automotive','cg-ai','fmcg','video','bts']) {
+   const [response,project]=await json('/api/admin/projects',{method:'POST',body:{...details,category},auth:true});
+   assert.equal(response.status,201);assert.equal(project.category,category);
+   assert.equal((await req('/api/admin/projects/'+project.id,{method:'DELETE',auth:true})).status,200);
+  }
   assert.equal((await req('/api/admin/projects',{method:'POST',body:details,auth:true,token:false})).status,403);
   assert.equal((await req('/api/admin/projects',{method:'POST',body:details,auth:true,from:'https://evil.example'})).status,403);
   let created;[r,created]=await json('/api/admin/projects',{method:'POST',body:details,auth:true});assert.equal(r.status,201);const endpoint='/api/admin/projects/'+created.id;

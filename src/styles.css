@@ -2098,3 +2098,46 @@ main {
 @media (max-width: 960px) {
   .admin-sidebar-backdrop { position: fixed; inset: 58px 0 0; z-index: 59; display: block; border: 0; background: rgb(0 0 0 / 0.42); }
 }
+
+/* Video uploads are independent from the image cover and gallery. */
+.video-manager { padding-top: 44px; }
+.video-help, .video-poll-error { margin: 16px 0 0 44px; color: #636869; font-size: 0.72rem; line-height: 1.8; }
+.video-poll-error { color: #933d32; }
+.admin-video-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 28px 0 0 44px; }
+.admin-video-grid article { min-width: 0; overflow: hidden; border: 1px solid #d0d3d1; border-radius: 4px; background: #fff; }
+.admin-video-grid video, .video-placeholder { display: flex; width: 100%; height: 240px; align-items: center; justify-content: center; gap: 12px; background: #171919; color: #d7dbda; object-fit: contain; }
+.video-placeholder { font-size: 0.78rem; }
+.video-placeholder svg { width: 22px; }
+.video-card-info { padding: 16px; }
+.video-card-info h3 { overflow: hidden; font-size: 0.85rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.video-status, .video-details, .video-error { margin-top: 8px; font-size: 0.7rem; line-height: 1.6; overflow-wrap: anywhere; }
+.video-status { color: #636869; }
+.video-status-ready { color: #16725d; }
+.video-status-failed, .video-error { color: #933d32; }
+.video-details { color: #636869; }
+.video-card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+.video-card-actions button { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; border: 1px solid #c9ccca; border-radius: 3px; padding: 6px 10px; background: #fff; color: #111314; font-size: 0.7rem; cursor: pointer; }
+.video-card-actions svg { width: 14px; }
+.project-videos { display: grid; gap: 48px; padding: 40px 7vw 80px; }
+.project-videos figure { min-width: 0; }
+.project-videos video { display: block; width: 100%; max-height: 85vh; background: #111; object-fit: contain; }
+.project-videos figcaption { padding-top: 12px; color: #888; font-size: 0.75rem; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .admin-video-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .admin-video-grid, .video-help, .video-poll-error { margin-left: 0; }
+  .admin-video-grid video, .video-placeholder { height: 210px; }
+  .project-videos { gap: 28px; padding: 20px 5vw 45px; }
+}
+
+/* Admin storage is independent of project drafts and mutation controls. */
+.storage-overview { margin: 0 0 32px; padding: 24px; border: 1px solid #ddd9d1; border-radius: 8px; background: #faf9f6; }
+.storage-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.storage-heading h2 { margin: 0; font-size: 18px; }
+.storage-heading button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; white-space: nowrap; }
+.storage-heading button:disabled { opacity: .6; cursor: wait; }
+.storage-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 24px 0; }
+.storage-stats dt { font-size: 12px; color: #666; }
+.storage-stats dd { margin: 8px 0 0; font-size: 24px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.storage-overview p, .storage-overview small { font-size: 12px; line-height: 1.7; color: #666; }
+.storage-overview .storage-warning, .storage-overview [role=alert] { color: #a43e21; }
+@media(max-width: 600px) { .storage-overview { padding: 16px; } .storage-stats { gap: 16px 10px; } .storage-stats dd { font-size: 20px; } }

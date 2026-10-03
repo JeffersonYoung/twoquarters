@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
-import { categoryLabels, type ProjectCategory } from "../data";
+import { categoryLabels, selectableCategories, type ProjectCategory } from "../data";
 import { useProjects } from "../ProjectsContext";
 
 type Filter = "all" | ProjectCategory;
 
 const filters: { value: Filter; label: string }[] = [
   { value: "all", label: "全部" },
-  { value: "automotive", label: categoryLabels.automotive },
-  { value: "fashion", label: categoryLabels.fashion },
-  { value: "bts", label: categoryLabels.bts },
+  ...selectableCategories.map(value => ({ value, label: categoryLabels[value] })),
 ];
 
 export function WorksPage() {

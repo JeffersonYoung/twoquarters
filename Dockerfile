@@ -10,6 +10,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/app/data
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY package.json package-lock.json ./
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY server ./server
 COPY scripts/admin.mjs ./scripts/admin.mjs

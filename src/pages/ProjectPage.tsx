@@ -57,6 +57,17 @@ export function ProjectPage() {
         ))}
       </section>
 
+      {project.videos?.some((video) => video.status === "ready") && (
+        <section className="project-videos" aria-label="项目视频">
+          {project.videos.filter((video) => video.status === "ready").map((video) => (
+            <figure key={video.id}>
+              <video src={video.src} controls playsInline preload="metadata" aria-label={video.name} />
+              <figcaption>{video.name}</figcaption>
+            </figure>
+          ))}
+        </section>
+      )}
+
       <section className="project-credit">
         <span>Credits</span>
         <p>{project.credits}</p>

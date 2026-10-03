@@ -1,6 +1,6 @@
 # Twoquarters · self-hosted portfolio
 
-A standalone migration of the original portfolio UI. React/Vite frontend, Node 24 HTTP server, SQLite metadata and local image files. No Supabase, Sites, external authentication, remote image host, CDN, analytics or font service is used at runtime. Public visitors can browse without login. `/admin` uses an owner-created username/password.
+A standalone migration of the original portfolio UI. React/Vite frontend, Node 24 HTTP server, SQLite metadata and local image/video files. No Supabase, Sites, external authentication, remote image host, CDN, analytics or font service is used at runtime. Public visitors can browse without login. `/admin` uses an owner-created username/password.
 
 Source repository: https://github.com/JeffersonYoung/JeffersonYoung.github.io (original checkout commit `d38724ca15c4194eb7cd768e47d1fc857d27a0de`).
 
@@ -8,7 +8,7 @@ Only the six repository sample projects and their repository images are imported
 
 ## Local run
 
-Requires Node **24.x** (native `node:sqlite`) and npm. Install/build require access to npm; running the built app does not.
+Requires Node **24.x** (native `node:sqlite`), npm, and local **FFmpeg/ffprobe** with the libx264 and AAC encoders (Docker installs the distro packages). Install/build require access to npm; running the built app does not.
 
     npm ci --ignore-scripts
     npm run build
@@ -32,7 +32,7 @@ For frontend development, run the API as above plus `npm run dev`; Vite proxies 
 7. Route your existing HTTPS reverse proxy to `127.0.0.1:3000`. An Nginx location example is included under `deploy/`. Configure your own valid TLS certificate and redirect HTTP to HTTPS. The application refuses production mode with an HTTP origin, and uses Secure cookies under HTTPS.
 8. Check `docker compose ps`, visit the public site, log into `/admin`, upload a temporary draft, publish/unpublish it, then remove it. Confirm an anonymous browser cannot access a draft image.
 
-Container port 3000 is bound only to server loopback. The app runs as the unprivileged `node` user, with a read-only root filesystem and a persistent data volume. Preserve that volume on upgrades. **Never run `docker compose down -v` unless you intentionally want to destroy all content and account data.** Docker image pulls and certificate issuance/renewal require network access; app/page operation uses only your server. The server uses the locally installed Sharp image decoder; there are no remote API or runtime service dependencies.
+Container port 3000 is bound only to server loopback. The app runs as the unprivileged `node` user, with a read-only root filesystem and a persistent data volume. Preserve that volume on upgrades. **Never run `docker compose down -v` unless you intentionally want to destroy all content and account data.** Docker image pulls and certificate issuance/renewal require network access; app/page operation uses only your server. The server uses the locally installed Sharp image decoder and FFmpeg/ffprobe video tools; there are no remote API or runtime service dependencies.
 
 If installing without Docker, build under Node 24, run as a dedicated non-root OS user, place DATA_DIR in a private writable directory, set `NODE_ENV=production`, `APP_ORIGIN=https://your-domain`, and put the loopback listener behind the same TLS reverse proxy. Use your normal system service manager for restart-on-failure.
 
@@ -63,6 +63,20 @@ Restore into an **empty new volume or private staging directory**, not over a ru
 
 Uploads are decoded and re-encoded locally, stripping metadata and rejecting malformed images and excessive dimensions/frame counts. Uploaded images removed through admin are deleted from disk. Project deletion permanently removes that project's metadata/uploads from the active store; use backups for recovery. Bundled sample image files are never removed from the application.
 
+## Video uploads and local compression
+
+Admin projects accept one MP4, MOV (ISO BMFF/`ftyp` container), or WebM per upload, up to **250 MiB**, **10 minutes**, **4K (long edge ≤4096; ≤8,847,360 pixels)** and **120 input fps**. Older QuickTime MOV files without an `ftyp` header must be exported as MP4 first. Uploads stream to a private temporary file, rather than buffering the whole video in Node memory. The project still needs an image cover before publication; ready videos appear on its detail page and in admin previews.
+
+The SQLite-backed queue runs **one local FFmpeg encode at a time** (two codec threads, one filter thread). Container signatures and ffprobe metadata are checked; actual decoding/encoding must succeed. Explicit MOV/Matroska demuxers and file-only protocols prevent playlist/network input. Output is H.264 (`libx264`, **CRF 22**, **fast** preset, `yuv420p`) plus optional AAC stereo **128 kbps / 48 kHz**, with metadata/chapters/subtitles removed and MP4 **faststart**. Output frame rate is capped at 30 fps. Landscape fits 1920×1080, portrait fits 1080×1920, square fits 1080×1080; aspect ratio/orientation are preserved without cropping or upscaling (dimensions rounded to even pixels). CRF is a quality target, not a promised size reduction; a tiny or already highly compressed source can become larger. HDR/10-bit footage is converted to 8-bit without a dedicated tone-mapping workflow; export SDR footage for predictable colors.
+
+**Originals are never retained after processing**, whether it succeeds, fails, times out, or is cancelled. Partial outputs are also removed; only a validated, atomically renamed compressed MP4 becomes playable. Failed records retain a readable error, but retry requires a fresh upload. Interrupted uploads/encodes become failed and their temporary files are removed at startup; complete queued uploads continue processing after restart. Orphan video files are cleaned at startup. Keep your own original master files elsewhere before uploading.
+
+Limits: at most **two simultaneous uploads**, **eight active/queued jobs**, **250 MiB output**, **30 seconds per probe** and **15 minutes per encode**. New jobs reserve **1 GiB free disk plus 500 MiB per active/new job** conservatively; admission is rejected when the filesystem is below this threshold. These checks reduce exhaustion risk but cannot reserve space against other host processes, so monitor disk usage. Deleting a video/project removes its compressed file and any staged input. Draft video metadata and bytes require the admin session; new anonymous requests are denied immediately on unpublish, including GET, HEAD and Range requests. Sources are never exposed through public routes.
+
+Browsers receive only the normalized MP4; H.264/AAC playback still depends on browser/OS codec support (some Chromium/Linux builds omit proprietary codecs). Input codec support depends on the installed FFmpeg build. There is no remote storage, transcoding, CDN or streaming service, and no adaptive-bitrate/HLS rendition. Byte-range streaming supports seeking without loading the entire file into server memory.
+
+Docker now installs FFmpeg and allows **2 CPU / 2 GiB RAM** for the service; provision at least that much plus OS/reverse-proxy overhead, and more storage for published videos. Keep FFmpeg and Node patched. For bare-metal installs, apply equivalent CPU/memory/process limits with your service manager. Use the updated Nginx example (`250m` body limit, streaming request buffering disabled, 600-second timeouts) so the proxy neither rejects videos nor stores another temporary original. The sample Compose file was statically reviewed, not built in this workspace.
+
 ## Validation
 
     npm run build
@@ -71,3 +85,11 @@ Uploads are decoded and re-encoded locally, stripping metadata and rejecting mal
     npm run test:ui
 
 Backend tests create isolated temporary data and test-only passwords, never production credentials. UI tests require Playwright Chromium (`npx playwright install chromium` if needed). See `VALIDATION.md` for actual executed results and deployment limits.
+
+## Admin storage and categories
+
+After login, the admin page shows the filesystem containing `DATA_DIR`: total, used by **all** applications, available to the app process (`bavail`, not `bfree`), and system-reserved free space. It also shows an estimated allocated-block total for the site's SQLite/WAL/SHM and flat `uploads/` files, including in-progress video files. This is separate from whole-filesystem usage; it excludes source code, backups and unrelated directories. Sparse files use allocated blocks rather than apparent length; hard links are counted once. No file contents are read and symlink/nested entries are not followed. A scan is bounded to 10,000 entries and a 250 ms cooperative budget; failures, unexpected entries or interrupted scans display “unavailable”, not zero. Scans are non-atomic estimates while uploads, SQLite or other filesystem users change files.
+
+Use **刷新空间** or reload to refresh the sample without saving/discarding a project draft. The authenticated, no-store `GET /api/admin/storage` exposes numeric totals only, never host paths; unavailable filesystem statistics produce a generic error. This is not a per-container quota report: filesystem reporting can differ from hosting quotas, Docker writable-layer limits and actual ability to write. If `uploads/` is on a separate mount, its available bytes are shown separately for video admission. One new video requires 1 GiB reserve plus 500 MiB for each active job and the new job; displayed eligibility is only the space check, and upload-time checks and queue/concurrency limits remain authoritative.
+
+Selectable project categories, in order: **汽车、CG&AI、快消、视频、幕后影像**. Existing `automotive` and `bts` records retain their identities; the user-approved `fashion` → `fmcg` migration runs on startup and preserves all other project metadata and image references. New sample content uses `fmcg`. Uploading a video does not change its project's category. Back up the data directory before upgrading as usual.

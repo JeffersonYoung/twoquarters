@@ -1,4 +1,4 @@
-import type { Project, ProjectImage } from "../data";
+import type { Project, ProjectImage, ProjectVideo } from "../data";
 
 export type AdminProject = Omit<Project, "cover"> & {
   id: string;
@@ -19,10 +19,15 @@ export class ApiError extends Error {
   }
 }
 
-async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+async function api<T>(path: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
   const form = body instanceof FormData;
+  const file = body instanceof File;
   const headers = new Headers();
-  if (body !== undefined && !form) headers.set("Content-Type", "application/json");
+  if (body !== undefined && !form && !file) headers.set("Content-Type", "application/json");
+  if (file) {
+    headers.set("Content-Type", body.type || "application/octet-stream");
+    headers.set("X-Upload-Name", encodeURIComponent(body.name));
+  }
   if (method !== "GET" && path !== "/login") {
     if (!csrfToken) throw new ApiError("登录已过期，请重新登录后继续", 401);
     headers.set("X-CSRF-Token", csrfToken);
@@ -32,7 +37,8 @@ async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> 
     credentials: "same-origin",
     cache: "no-store",
     headers,
-    body: body === undefined ? undefined : form ? body as FormData : JSON.stringify(body),
+    signal,
+    body: body === undefined ? undefined : (form || file) ? body as FormData | File : JSON.stringify(body),
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
@@ -64,7 +70,7 @@ export async function logout() {
 }
 
 export const listPublishedProjects = () => api<Project[]>("/projects");
-export const listAdminProjects = () => api<AdminProject[]>("/admin/projects");
+export const listAdminProjects = (signal?: AbortSignal) => api<AdminProject[]>("/admin/projects", "GET", undefined, signal);
 export const createProject = (draft: ProjectDraft) => api<{ slug: string }>("/admin/projects", "POST", draft);
 export const updateProject = (id: string, draft: ProjectDraft) => api(`/admin/projects/${encodeURIComponent(id)}`, "PATCH", draft);
 export const setProjectCover = (project: AdminProject, imageId: string) =>
@@ -77,3 +83,16 @@ export async function uploadProjectImages(project: AdminProject, files: File[]) 
 export const deleteProjectImage = (project: AdminProject, image: ProjectImage) =>
   api(`/admin/projects/${encodeURIComponent(project.id)}/images/${encodeURIComponent(image.id || "")}`, "DELETE");
 export const deleteProject = (project: AdminProject) => api(`/admin/projects/${encodeURIComponent(project.id)}`, "DELETE");
+
+export const uploadProjectVideo = (project: AdminProject, file: File) =>
+  api<AdminProject>(`/admin/projects/${encodeURIComponent(project.id)}/videos`, "POST", file);
+export const deleteProjectVideo = (project: AdminProject, video: ProjectVideo) =>
+  api<AdminProject>(`/admin/projects/${encodeURIComponent(project.id)}/videos/${encodeURIComponent(video.id)}`, "DELETE");
+
+export type StorageOverview = {
+  sampledAt: string;
+  filesystem: { totalBytes: number; usedBytes: number; availableBytes: number; reservedBytes: number };
+  managedFiles: { allocatedBytes: number; logicalBytes: number } | null;
+  video: { reserveBytes: number; maxFileBytes: number; activeJobs: number; requiredBytes: number; availableBytes: number; hasSpaceForNextUpload: boolean };
+};
+export const getStorageOverview = (signal?: AbortSignal) => api<StorageOverview>("/admin/storage", "GET", undefined, signal);

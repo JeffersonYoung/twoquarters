@@ -1,3 +1,4 @@
+import { StorageOverview } from "../components/StorageOverview";
 import {
   ArrowUpRight,
   AlertCircle,
@@ -14,10 +15,11 @@ import {
   Star,
   Trash2,
   UploadCloud,
+  Video,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import type { ProjectCategory, ProjectImage } from "../data";
+import { categoryLabels, selectableCategories, type ProjectCategory, type ProjectImage, type ProjectVideo } from "../data";
 import {
   createProject,
   deleteProject as removeProject,
@@ -30,6 +32,8 @@ import {
   setProjectCover,
   updateProject,
   uploadProjectImages,
+  uploadProjectVideo,
+  deleteProjectVideo,
   type AdminProject,
   type ProjectDraft,
 } from "../lib/projects";
@@ -85,6 +89,10 @@ export function AdminPage() {
   const [dragging, setDragging] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoPollError, setVideoPollError] = useState("");
+  const publicRefresh = useRef(refreshPublishedProjects);
+  useEffect(() => { publicRefresh.current = refreshPublishedProjects; }, [refreshPublishedProjects]);
   const inputRef = useRef<HTMLInputElement>(null);
   const operation = useRef(false);
   const loadSequence = useRef(0);
@@ -153,6 +161,43 @@ export function AdminPage() {
     if (session === "authenticated") void loadProjects();
     return () => { loadSequence.current += 1; };
   }, [session, loadProjects]);
+
+  const pendingVideos = projects.flatMap((project) => (project.videos || [])
+    .filter((video) => video.status === "uploading" || video.status === "queued" || video.status === "processing")
+    .map((video) => `${video.id}:${video.status}`)).join(",");
+
+  useEffect(() => {
+    if (session !== "authenticated" || !pendingVideos) return;
+    let active = true;
+    let timer: number;
+    const controller = new AbortController();
+    async function poll() {
+      if (!active) return;
+      if (operation.current) { timer = window.setTimeout(() => void poll(), 2000); return; }
+      const sequence = loadSequence.current;
+      try {
+        const loaded = await listAdminProjects(controller.signal);
+        if (!active || operation.current || sequence !== loadSequence.current) return;
+        // Only merge video state: polling never replaces unsaved editor fields.
+        setProjects((current) => current.map((project) => {
+          const latest = loaded.find((item) => item.id === project.id);
+          return latest ? { ...project, videos: latest.videos } : project;
+        }));
+        setVideoPollError("");
+        const finished = loaded.some((project) => project.videos?.some((video) =>
+          (video.status === "ready" || video.status === "failed") && pendingVideos.includes(`${video.id}:`)));
+        if (finished) void publicRefresh.current();
+      } catch (error) {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) showError(error, "登录已过期");
+        else setVideoPollError("暂时无法更新视频状态，正在自动重试。");
+      } finally {
+        if (active) timer = window.setTimeout(() => void poll(), 2500);
+      }
+    }
+    timer = window.setTimeout(() => void poll(), 2000);
+    return () => { active = false; window.clearTimeout(timer); controller.abort(); };
+  }, [session, pendingVideos, selectedSlug, showError]);
 
   useEffect(() => {
     if (!dirty && !busy) return;
@@ -307,6 +352,29 @@ export function AdminPage() {
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  async function uploadVideo(file?: File) {
+    if (!selected || !file || locked || operation.current) return;
+    const types = ["video/mp4", "video/quicktime", "video/webm"];
+    if (!types.includes(file.type) || file.size === 0 || file.size > 250 * 1024 * 1024) {
+      setNotice({ text: "请选择 MP4、MOV 或 WebM 视频，单个文件最大 250MiB，且不能为空", error: true });
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+    await runAction(async () => {
+      await uploadProjectVideo(selected, file);
+      await loadProjects(selected.slug);
+    }, "视频已上传，正在后台压缩。可以继续编辑项目资料。");
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
+  async function deleteVideo(video: ProjectVideo) {
+    if (!selected || locked || operation.current || !window.confirm(`确定删除视频“${video.name}”？压缩版本和处理记录都会被删除。`)) return;
+    await runAction(async () => {
+      await deleteProjectVideo(selected, video);
+      await loadProjects(selected.slug);
+    }, "视频已删除");
+  }
+
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
@@ -334,7 +402,7 @@ export function AdminPage() {
   }
 
   async function deleteProject() {
-    if (!selected || locked || operation.current || !window.confirm(`确定删除项目“${selected.title}”？上传的图片也会被删除。`)) return;
+    if (!selected || locked || operation.current || !window.confirm(`确定删除项目“${selected.title}”？上传的图片和视频也会被删除。`)) return;
     await runAction(async () => {
       await removeProject(selected);
       setEditor(editorFor(null));
@@ -354,7 +422,7 @@ export function AdminPage() {
         <form onSubmit={signIn} aria-busy={busy}>
           <span className="admin-eyebrow">Content administration</span>
           <h1>管理后台</h1>
-          <p>使用本站管理员账号登录，管理作品、封面和图片。</p>
+          <p>使用本站管理员账号登录，管理作品、封面、图片和视频。</p>
           <label htmlFor="admin-username">用户名</label>
           <div className="login-field username-field">
             <input id="admin-username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={80} disabled={busy} />
@@ -409,6 +477,7 @@ export function AdminPage() {
       </aside>
 
       <section className="admin-workspace" aria-busy={locked}>
+        <StorageOverview onAuthError={showError} />
         {loadError && <div className="admin-load-error" role="alert">{loadError} <button type="button" disabled={locked} onClick={() => void loadProjects()}>重新加载项目</button></div>}
         {projectsLoading && !projects.length && <p className="admin-empty-state" role="status">正在加载项目…</p>}
         {!projectsLoading && !loadError && !projects.length && !creating && <p className="admin-empty-state">还没有项目。点击“新建项目”添加第一个作品。</p>}
@@ -433,9 +502,7 @@ export function AdminPage() {
               <label>英文标题<input value={draft.titleEn} required onChange={(event) => updateDraft("titleEn", event.target.value)} /></label>
               <label>分类
                 <select value={draft.category} onChange={(event) => updateDraft("category", event.target.value as ProjectCategory)}>
-                  <option value="automotive">汽车与 CGI</option>
-                  <option value="fashion">时尚与美妆</option>
-                  <option value="bts">幕后影像</option>
+                  {selectableCategories.map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}
                 </select>
               </label>
               <label>年份<input value={draft.year} required maxLength={8} onChange={(event) => updateDraft("year", event.target.value)} /></label>
@@ -503,6 +570,39 @@ export function AdminPage() {
             ) : (
               <div className="empty-library"><ImageIcon aria-hidden="true" /><h3>还没有图片</h3><p>上传第一张图片后即可设置封面并发布项目。</p></div>
             )}
+          </section>
+        )}
+        {selected && (
+          <section className="video-manager" aria-labelledby="video-manager-title">
+            <div className="editor-section-heading"><span>03</span><h2 id="video-manager-title">项目视频</h2><em>{selected.videos?.length || 0} 个</em></div>
+            <div className="upload-zone">
+              <Video aria-hidden="true" />
+              <div><strong>上传视频，自动压缩</strong><span>MP4、MOV、WebM；单个文件最大 250MiB</span></div>
+              <button type="button" onClick={() => videoInputRef.current?.click()} disabled={locked}>选择视频</button>
+              <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" disabled={locked} onChange={(event) => void uploadVideo(event.target.files?.[0])} />
+            </div>
+            <p className="video-help">在本站服务器本地转码为 H.264 / AAC MP4，CRF 22；横屏最高 1920 × 1080，竖屏最高 1080 × 1920，不放大小尺寸视频。临时原始文件在处理成功或失败后都会删除，仅保留压缩完成的视频；失败后需重新上传。公开页面仅展示压缩完成的视频。发布项目仍需图片封面。</p>
+            {videoPollError && pendingVideos && <p className="video-poll-error" role="status">{videoPollError}</p>}
+            {selected.videos?.length ? (
+              <div className="admin-video-grid">
+                {selected.videos.map((video) => (
+                  <article key={video.id}>
+                    {video.status === "ready" ? <video src={video.src} controls playsInline preload="metadata" aria-label={video.name} /> : (
+                      <div className="video-placeholder">{video.status === "failed" ? <AlertCircle aria-hidden="true" /> : <Loader2 className="spin" aria-hidden="true" />}<span>{video.status === "failed" ? "压缩失败" : video.status === "uploading" ? "正在上传" : video.status === "queued" ? "等待压缩" : "正在压缩"}</span></div>
+                    )}
+                    <div className="video-card-info">
+                      <h3 title={video.name}>{video.name}</h3>
+                      <p className={`video-status video-status-${video.status}`} role="status">{video.status === "ready" ? "已就绪" : video.status === "failed" ? "处理失败" : video.status === "uploading" ? "正在上传" : video.status === "queued" ? "已排队 · 可以继续编辑" : "处理中 · 可以继续编辑"}</p>
+                      {video.status === "failed" && <p className="video-error">{video.error || "视频压缩失败。"} 原始文件已清理，请删除此记录后重新上传。</p>}
+                      {video.status === "ready" && <p className="video-details">{video.width && video.height ? `${video.width} × ${video.height}` : "MP4"}{video.duration ? ` · ${Math.round(video.duration)} 秒` : ""}{video.outputBytes ? ` · ${(video.outputBytes / 1024 / 1024).toFixed(1)} MiB` : ""}</p>}
+                      <div className="video-card-actions">
+                        <button type="button" disabled={locked} onClick={() => void deleteVideo(video)} aria-label={`删除视频 ${video.name}`}><Trash2 aria-hidden="true" /> 删除</button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : <div className="empty-library"><Video aria-hidden="true" /><h3>还没有视频</h3><p>视频为可选内容，上传后会自动压缩并显示在项目详情页。</p></div>}
           </section>
         )}
       </section>

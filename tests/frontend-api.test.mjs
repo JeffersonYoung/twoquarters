@@ -38,6 +38,8 @@ test('frontend API session, mutation, and recovery contract', async t => {
     await client.setProjectCover(fixture, 'image fixture');
     await client.uploadProjectImages(fixture, [new File(['fixture'], 'fixture.jpg', { type: 'image/jpeg' })]);
     await client.deleteProjectImage(fixture, { id: 'image fixture' });
+    await client.uploadProjectVideo(fixture, new File(['test video'], '测试 clip.mp4', { type: 'video/mp4' }));
+    await client.deleteProjectVideo(fixture, { id: 'video fixture' });
     await client.deleteProject(fixture);
     await client.listAdminProjects();
     await client.logout();
@@ -48,6 +50,11 @@ test('frontend API session, mutation, and recovery contract', async t => {
     }
     const upload = requests.find(({ options }) => options.body instanceof FormData);
     assert.ok(upload);
+    const video = requests.find(({ options }) => options.body instanceof File);
+    assert.ok(video);
+    assert.equal(video.options.headers.get('Content-Type'), 'video/mp4');
+    assert.equal(video.options.headers.get('X-Upload-Name'), encodeURIComponent('测试 clip.mp4'));
+    assert.ok(requests.some(({ url }) => url.includes('test%20id/videos/video%20fixture')));
     assert.equal(upload.options.headers.has('Content-Type'), false, 'browser must supply the multipart boundary');
     assert.equal(upload.options.body.getAll('images').length, 1);
     assert.ok(requests.some(({ url }) => url.includes('test%20id/images/image%20fixture')));
@@ -80,6 +87,20 @@ test('frontend API session, mutation, and recovery contract', async t => {
     await pending;
     await client.createProject(draft);
     assert.equal(savedToken, 'new-login-token');
+  });
+
+  await t.test('storage is an authenticated same-origin read with abort and error support', async () => {
+    const client = await freshClient();
+    const controller = new AbortController();
+    const fixture = { filesystem: { availableBytes: 123 }, managedFiles: null };
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, '/api/admin/storage');assert.equal(options.method, 'GET');
+      assert.equal(options.cache, 'no-store');assert.equal(options.credentials, 'same-origin');
+      assert.equal(options.signal, controller.signal);return json(fixture);
+    };
+    assert.deepEqual(await client.getStorageOverview(controller.signal), fixture);
+    globalThis.fetch = async () => new Response('{"error":"unavailable"}', { status: 500 });
+    await assert.rejects(client.getStorageOverview(), error => error.status === 500);
   });
 
   await t.test('reports non-JSON server failures without a JSON parsing crash', async () => {

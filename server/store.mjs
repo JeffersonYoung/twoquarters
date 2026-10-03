@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users(username TEXT PRIMARY KEY,password TEXT NOT NUL
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,username TEXT NOT NULL,csrf TEXT NOT NULL,expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,slug TEXT UNIQUE NOT NULL,data TEXT NOT NULL,published INTEGER NOT NULL,sort_order INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS login_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,reset INTEGER NOT NULL);`);
+// User-approved category migration: preserve all project metadata and image references.
+db.exec("UPDATE projects SET data=json_set(data,'$.category','fmcg') WHERE json_extract(data,'$.category')='fashion'");
 export function seed() {
  if (db.prepare('SELECT value FROM settings WHERE key=?').get('seed')) return;
  const source = JSON.parse(readFileSync(path.join(root, 'server/seed.json'), 'utf8'));

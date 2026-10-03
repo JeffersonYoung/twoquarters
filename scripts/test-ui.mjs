@@ -55,7 +55,8 @@ try {
 
   await page.goto(`${origin}/works`);
   await count('.works-grid .project-card', 6);
-  await page.getByRole('tab', { name: '时尚与美妆' }).click();
+  assert.deepEqual(await page.locator('.filter-tabs button').evaluateAll(buttons => buttons.map(button => button.childNodes[0].textContent)), ['全部','汽车','CG&AI','快消','视频','幕后影像']);
+  await page.getByRole('tab', { name: '快消' }).click();
   await count('.works-grid .project-card', 1);
   await page.getByRole('tab', { name: '全部' }).click();
   await count('.works-grid .project-card', 6);
@@ -76,6 +77,20 @@ try {
   await fillLogin();
   await count('.admin-sidebar nav button', 6);
   await ready();
+  await page.locator('.storage-stats').waitFor();
+  assert.equal(await page.locator('.storage-stats dd').count(),4);
+  assert.deepEqual(await page.getByLabel('分类', { exact: true }).locator('option').allTextContents(), ['汽车','CG&AI','快消','视频','幕后影像']);
+  await page.getByLabel('中文标题', { exact: true }).fill('存储刷新保留草稿');
+  await page.route('**/api/admin/storage', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"fixture"}' }));
+  await page.getByRole('button', { name: '刷新空间', exact: true }).click();
+  await page.locator('.storage-overview [role=alert]').waitFor();
+  assert.equal(await page.locator('.storage-stats').count(),0);
+  assert.equal(await page.getByLabel('中文标题', { exact: true }).inputValue(),'存储刷新保留草稿');
+  await page.unroute('**/api/admin/storage');
+  await page.getByRole('button', { name: '刷新空间', exact: true }).click();
+  await page.locator('.storage-stats').waitFor();
+  // Restore the saved title before the reload flow to avoid an unsaved-change prompt.
+  await page.getByLabel('中文标题', { exact: true }).fill(await page.locator('.workspace-heading h1').textContent());
   const cookie = (await context.cookies()).find(item => item.name === 'tq_session');
   assert.equal(cookie?.httpOnly, true);
   assert.equal(cookie?.sameSite, 'Strict');
@@ -102,9 +117,9 @@ try {
   const slug = await page.locator('.workspace-heading > div > span').textContent();
   assert.ok(slug.startsWith('ui-test-project-'));
   await page.getByLabel('中文标题', { exact: true }).fill('图片上传期间的未保存资料');
-  await page.locator('input[type=file]').setInputFiles({ name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
+  await page.locator('.image-manager input[type=file]').setInputFiles({ name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
   await visible('.admin-notice.is-error');
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('.image-manager input[type=file]').setInputFiles([
     path.join(root, 'server/seed-images/bts/vitalik-vynarchyk-TUzsO59UFpo-unsplash.jpg'),
     path.join(root, 'server/seed-images/fashion/mina-rad-V94CguEmeos-unsplash.jpg'),
   ]);
@@ -114,6 +129,18 @@ try {
   await page.locator('.admin-image-grid article').nth(1).getByTitle('设为封面').click();
   await ready();
   assert.equal(await page.locator('.admin-image-grid article').nth(1).locator('.image-card-info em').count(), 1);
+  const videoFixture = path.join(directory, 'fixture.mp4');
+  execFileSync('ffmpeg', ['-v','error','-f','lavfi','-i','testsrc2=size=96x64:rate=12','-t','1','-c:v','libx264','-threads','1','-pix_fmt','yuv420p',videoFixture]);
+  await page.locator('.video-manager input[type=file]').setInputFiles({ name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('invalid') });
+  await visible('.admin-notice.is-error');
+  await page.locator('.video-manager input[type=file]').setInputFiles(videoFixture);
+  await count('.admin-video-grid article', 1);
+  await ready();
+  await page.getByLabel('中文标题', { exact: true }).fill('视频处理期间保留的资料');
+  await page.locator('.admin-video-grid video').waitFor({ state: 'visible', timeout: 60000 });
+  assert.equal(await page.getByLabel('中文标题', { exact: true }).inputValue(), '视频处理期间保留的资料');
+  const videoSrc = await page.locator('.admin-video-grid video').getAttribute('src');
+  assert.equal((await fetch(origin + videoSrc)).status, 404, 'anonymous draft video must stay private');
   await page.getByLabel('中文标题', { exact: true }).fill('UI 测试已发布');
   await page.getByLabel('允许在公开网站展示').check();
   await page.getByRole('button', { name: '保存资料' }).click();
@@ -122,6 +149,9 @@ try {
   const publicPage = await context.newPage();
   await publicPage.goto(`${origin}/works/${slug}`);
   await publicPage.getByRole('heading', { name: 'UI 测试已发布', exact: true }).waitFor();
+  await publicPage.locator('.project-videos video').waitFor();
+  assert.equal((await fetch(origin + videoSrc)).status, 200);
+  await publicPage.waitForFunction(() => document.querySelector('.project-videos video')?.readyState >= 1);
   await publicPage.locator('.project-gallery button').first().click();
   await publicPage.getByRole('dialog').waitFor();
   await publicPage.keyboard.press('Escape');
@@ -147,6 +177,14 @@ try {
   await page.getByRole('button', { name: '保存资料' }).click();
   await ready();
   assert.equal((await (await context.request.get(`${origin}/api/projects`)).json()).length, 6);
+  assert.equal((await fetch(origin + videoSrc)).status, 404);
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.locator('.admin-video-grid button').click();
+  await count('.admin-video-grid article', 1);
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('.admin-video-grid button').click();
+  await count('.admin-video-grid article', 0);
+  await ready();
   page.once('dialog', dialog => dialog.dismiss());
   await page.locator('.admin-image-grid article').first().getByTitle('删除图片').click();
   await count('.admin-image-grid article', 2);
