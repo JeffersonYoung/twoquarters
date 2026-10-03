@@ -1,0 +1,214 @@
+[
+  {
+    "slug": "mclaren-velocity",
+    "title": "速度之形",
+    "titleEn": "Velocity, Shaped",
+    "category": "automotive",
+    "year": "2026",
+    "discipline": "CGI · 汽车视觉",
+    "summary": "在城市光线与机械曲面之间寻找速度的形状。项目以克制的镜头语言，把性能、空气动力学与夜色压缩进连续的视觉节奏。",
+    "cover": {
+      "src": "/images/automotive/hero-mclaren.jpg",
+      "alt": "红色 McLaren 在城市道路行驶"
+    },
+    "images": [
+      {
+        "src": "/images/automotive/1777374630909-1-ca56a1f2.jpg",
+        "alt": "红色 McLaren 城市动态视角"
+      },
+      {
+        "src": "/images/automotive/1777374630913-2-c83a4a9e.jpg",
+        "alt": "McLaren 车尾动态特写"
+      },
+      {
+        "src": "/images/automotive/1777374630917-3-d2162745.jpg",
+        "alt": "McLaren 城市道路侧面视角"
+      },
+      {
+        "src": "/images/automotive/1777374630921-4-ad047f03.jpg",
+        "alt": "McLaren 车身与城市光影"
+      }
+    ],
+    "credits": "Concept study · CGI direction by Twoquarters"
+  },
+  {
+    "slug": "porsche-911",
+    "title": "911 / 冷光",
+    "titleEn": "911 / Cold Light",
+    "category": "automotive",
+    "year": "2026",
+    "discipline": "CGI · 视觉开发",
+    "summary": "用六个镜头重构一辆经典跑车的秩序感。冷峻环境、精确反射与低饱和背景让轮廓成为画面的唯一叙事。",
+    "cover": {
+      "src": "/images/automotive/1777383964620-1-5038dd86.jpg",
+      "alt": "Porsche 911 概念视觉"
+    },
+    "images": [
+      {
+        "src": "/images/automotive/1777383964620-1-5038dd86.jpg",
+        "alt": "Porsche 911 正面概念视觉"
+      },
+      {
+        "src": "/images/automotive/1777383964624-2-5f645686.jpg",
+        "alt": "Porsche 911 车身侧面"
+      },
+      {
+        "src": "/images/automotive/1777383964627-3-57679b55.jpg",
+        "alt": "Porsche 911 车尾视角"
+      },
+      {
+        "src": "/images/automotive/1777383964631-4-edf2ba23.jpg",
+        "alt": "Porsche 911 细节光影"
+      },
+      {
+        "src": "/images/automotive/1777383964635-5-b6915b81.jpg",
+        "alt": "Porsche 911 环境视觉"
+      },
+      {
+        "src": "/images/automotive/1777383964639-6-e3ea657a.jpg",
+        "alt": "Porsche 911 动态构图"
+      }
+    ],
+    "credits": "Concept study · CGI direction by Twoquarters"
+  },
+  {
+    "slug": "g-class-monolith",
+    "title": "城市巨石",
+    "titleEn": "Urban Monolith",
+    "category": "automotive",
+    "year": "2026",
+    "discipline": "CGI · 汽车视觉",
+    "summary": "从建筑尺度出发理解车辆。硬朗体块被置于高密度城市空间，材质、阴影与透视共同建立稳定而直接的视觉重量。",
+    "cover": {
+      "src": "/images/automotive/1777383770220-1-f6dc0eef.jpg",
+      "alt": "Mercedes-Benz G-Class 城市概念视觉"
+    },
+    "images": [
+      {
+        "src": "/images/automotive/1777383770220-1-f6dc0eef.jpg",
+        "alt": "G-Class 城市正面视角"
+      },
+      {
+        "src": "/images/automotive/1777383770227-2-18a843c0.jpg",
+        "alt": "G-Class 城市侧面视角"
+      },
+      {
+        "src": "/images/automotive/1777383770231-3-f7ea4f12.jpg",
+        "alt": "G-Class 建筑环境视角"
+      },
+      {
+        "src": "/images/automotive/1777383770235-4-bf8b111f.jpg",
+        "alt": "G-Class 夜间城市视觉"
+      }
+    ],
+    "credits": "Concept study · CGI direction by Twoquarters"
+  },
+  {
+    "slug": "mini-after-dark",
+    "title": "夜行",
+    "titleEn": "After Dark",
+    "category": "automotive",
+    "year": "2026",
+    "discipline": "CGI · 视觉开发",
+    "summary": "以紧凑车身、霓虹反射和城市留白，建立一组更轻、更敏捷的夜间视觉。",
+    "cover": {
+      "src": "/images/automotive/1777384041371-1-0e8bb858.jpg",
+      "alt": "Mini Cooper 夜间概念视觉"
+    },
+    "images": [
+      {
+        "src": "/images/automotive/1777384041371-1-0e8bb858.jpg",
+        "alt": "Mini Cooper 夜间正面视角"
+      },
+      {
+        "src": "/images/automotive/1777384041375-2-747c8e90.jpg",
+        "alt": "Mini Cooper 夜间侧面视角"
+      }
+    ],
+    "credits": "Concept study · CGI direction by Twoquarters"
+  },
+  {
+    "slug": "chroma-objects",
+    "title": "色彩物件",
+    "titleEn": "Chroma Objects",
+    "category": "fashion",
+    "year": "2025",
+    "discipline": "静物摄影 · 美妆",
+    "summary": "柔和表面与明确阴影组成一套触觉化的色彩系统。镜头关注材质、比例，以及产品在极简空间中的存在方式。",
+    "cover": {
+      "src": "/images/fashion/mina-rad-V94CguEmeos-unsplash.jpg",
+      "alt": "紫色背景上的珠宝静物",
+      "credit": "Mina Rad / Unsplash"
+    },
+    "images": [
+      {
+        "src": "/images/fashion/mina-rad-V94CguEmeos-unsplash.jpg",
+        "alt": "紫色背景上的珠宝静物",
+        "credit": "Mina Rad / Unsplash"
+      },
+      {
+        "src": "/images/fashion/harper-sunday-FkxXePJJH5g-unsplash.jpg",
+        "alt": "编辑式时尚静物",
+        "credit": "Harper Sunday / Unsplash"
+      },
+      {
+        "src": "/images/fashion/laura-chouette-63obHScZWZw-unsplash.jpg",
+        "alt": "美妆产品静物",
+        "credit": "Laura Chouette / Unsplash"
+      },
+      {
+        "src": "/images/fashion/kamil-kalkan-7gqnlnCTvlg-unsplash.jpg",
+        "alt": "高对比时尚细节",
+        "credit": "Kamil Kalkan / Unsplash"
+      }
+    ],
+    "credits": "Editorial sample · Source credits shown per image"
+  },
+  {
+    "slug": "field-notes",
+    "title": "场域笔记",
+    "titleEn": "Field Notes",
+    "category": "bts",
+    "year": "2025",
+    "discipline": "勘景 · 幕后记录",
+    "summary": "把自然环境视为制作的一部分。光线、地貌和天气被记录成可供创意团队继续工作的视觉材料。",
+    "cover": {
+      "src": "/images/bts/azzedine-rouichi-ZS_XuDZmxpM-unsplash.jpg",
+      "alt": "沙漠岩石地貌",
+      "credit": "Azzedine Rouichi / Unsplash"
+    },
+    "images": [
+      {
+        "src": "/images/bts/azzedine-rouichi-ZS_XuDZmxpM-unsplash.jpg",
+        "alt": "沙漠岩石地貌",
+        "credit": "Azzedine Rouichi / Unsplash"
+      },
+      {
+        "src": "/images/bts/enyioma-adu-RuaRTaKi-D4-unsplash.jpg",
+        "alt": "自然环境竖幅记录",
+        "credit": "Enyioma Adu / Unsplash"
+      },
+      {
+        "src": "/images/bts/francesco-ungaro-P45gR9kH0SM-unsplash.jpg",
+        "alt": "宽幅环境勘景",
+        "credit": "Francesco Ungaro / Unsplash"
+      },
+      {
+        "src": "/images/bts/isaac-wolff-k_PbdrEs79g-unsplash.jpg",
+        "alt": "自然光线细节",
+        "credit": "Isaac Wolff / Unsplash"
+      },
+      {
+        "src": "/images/bts/veronica-wu-4f8u5mFGKjw-unsplash.jpg",
+        "alt": "环境色彩记录",
+        "credit": "Veronica Wu / Unsplash"
+      },
+      {
+        "src": "/images/bts/vitalik-vynarchyk-TUzsO59UFpo-unsplash.jpg",
+        "alt": "户外场景记录",
+        "credit": "Vitalik Vynarchyk / Unsplash"
+      }
+    ],
+    "credits": "Location study · Source credits shown per image"
+  }
+]

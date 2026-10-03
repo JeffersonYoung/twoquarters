@@ -1,0 +1,11 @@
+# Put into your existing HTTPS server block after configuring your real domain and certificate.
+# APP_ORIGIN must exactly match the browser's https://hostname[:port].
+client_max_body_size 64m;
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 60s;
+}
+# Do not expose port 3000 publicly or proxy arbitrary third-party origins here.
