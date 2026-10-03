@@ -1,4 +1,4 @@
-name: Staging CI
+name: Staging CI/CD
 on:
   push:
     branches: [main]
@@ -8,8 +8,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: staging-ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: staging-cicd-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   validate:
     runs-on: ubuntu-24.04
@@ -28,3 +28,37 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://staging.twoquarters.com.cn
+    steps:
+      - name: Configure restricted staging SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::Add repository secret STAGING_SSH_PRIVATE_KEY, then rerun this job."
+            exit 1
+          fi
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/staging_key"
+          printf '%s\n' '8.152.103.10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG8Gf6q21SdQjc5FdDo/3ct//Y2jt4KJf34e+DgGq7An' > "$HOME/.ssh/known_hosts"
+      - name: Deploy the tested commit and verify health
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          ssh -i "$HOME/.ssh/staging_key" \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            root@8.152.103.10 "deploy $DEPLOY_SHA"
+      - name: Remove private key
+        if: always()
+        run: rm -f "$HOME/.ssh/staging_key"
