@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY server ./server
-COPY scripts/admin.mjs scripts/init-samples.mjs scripts/prepare-images.mjs ./scripts/
+COPY scripts/admin.mjs scripts/init-samples.mjs scripts/prepare-images.mjs scripts/database.mjs ./scripts/
 COPY package.json ./package.json
 RUN mkdir /app/data && chown node:node /app/data
 USER node

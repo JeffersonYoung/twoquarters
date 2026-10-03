@@ -36,7 +36,9 @@ import {
   deleteProjectVideo,
   type AdminProject,
   type ProjectDraft,
+  type VideoCompressionMode,
 } from "../lib/projects";
+import { compressVideo } from "../lib/video-compression";
 import { Link } from "../router";
 import { imageVariant } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
@@ -91,6 +93,10 @@ export function AdminPage() {
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoMode, setVideoMode] = useState<VideoCompressionMode>("server");
+  const [videoTask, setVideoTask] = useState<{ phase: "compressing" | "uploading"; progress: number } | null>(null);
+  const videoAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => { videoAbort.current?.abort(); }, []);
   const [videoPollError, setVideoPollError] = useState("");
   const publicRefresh = useRef(refreshPublishedProjects);
   useEffect(() => { publicRefresh.current = refreshPublishedProjects; }, [refreshPublishedProjects]);
@@ -361,11 +367,45 @@ export function AdminPage() {
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
-    await runAction(async () => {
-      await uploadProjectVideo(selected, file);
+    const controller = new AbortController();
+    videoAbort.current = controller;
+    operation.current = true;
+    setBusy(true);
+    setNotice(null);
+    let prepared: Awaited<ReturnType<typeof compressVideo>> | undefined;
+    let uploadStarted = false;
+    try {
+      if (videoMode === "browser") {
+        setVideoTask({ phase: "compressing", progress: 0 });
+        prepared = await compressVideo(file, { signal: controller.signal, onProgress: (progress) => {
+          if (!controller.signal.aborted) setVideoTask({ phase: "compressing", progress });
+        } });
+      }
+      controller.signal.throwIfAborted();
+      // Browser mode can only send a completed output; never fall back to the original.
+      if (videoMode === "browser" && !prepared) throw new Error("没有生成压缩结果");
+      const uploadFile = videoMode === "browser" ? prepared!.file : file;
+      setVideoTask({ phase: "uploading", progress: 1 });
+      uploadStarted = true;
+      await uploadProjectVideo(selected, uploadFile, videoMode, controller.signal);
       await loadProjects(selected.slug);
-    }, "视频已上传，正在后台压缩。可以继续编辑项目资料。");
-    if (videoInputRef.current) videoInputRef.current.value = "";
+      setNotice({ text: "视频已上传，服务器正在验证与处理。符合条件的视频不会再次有损压缩，可以继续编辑项目资料。" });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setNotice({ text: uploadStarted ? "已停止上传请求。请查看视频列表确认服务器状态；已接收完成的视频可在列表中删除。" : "已取消本地处理，没有上传视频。" });
+        if (uploadStarted) await loadProjects(selected.slug);
+      } else if (!uploadStarted && videoMode === "browser") {
+        setNotice({ text: `浏览器压缩失败，没有上传视频：${error instanceof Error ? error.message : "无法处理此文件"}。可手动选择服务器处理后重新选择文件。`, error: true });
+      } else showError(error, "视频上传失败，请重试");
+    } finally {
+      try { await prepared?.dispose(); }
+      catch { setNotice({ text: "本地临时视频清理失败，请关闭此页面并清理本站存储。", error: true }); }
+      videoAbort.current = null;
+      operation.current = false;
+      setBusy(false);
+      setVideoTask(null);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+    }
   }
 
   async function deleteVideo(video: ProjectVideo) {
@@ -576,13 +616,24 @@ export function AdminPage() {
         {selected && (
           <section className="video-manager" aria-labelledby="video-manager-title">
             <div className="editor-section-heading"><span>03</span><h2 id="video-manager-title">项目视频</h2><em>{selected.videos?.length || 0} 个</em></div>
+            <fieldset className="video-compression-options" disabled={locked}>
+              <legend>上传前选择处理方式</legend>
+              <label><input type="radio" name="video-compression" value="server" checked={videoMode === "server"} onChange={() => setVideoMode("server")} /> 服务器处理（上传原文件）</label>
+              <label><input type="radio" name="video-compression" value="browser" checked={videoMode === "browser"} onChange={() => setVideoMode("browser")} /> 浏览器压缩（仅上传压缩结果）</label>
+            </fieldset>
             <div className="upload-zone">
               <Video aria-hidden="true" />
-              <div><strong>上传视频，自动压缩</strong><span>MP4、MOV、WebM；单个文件最大 250MiB</span></div>
+              <div><strong>{videoMode === "browser" ? "先在浏览器压缩，再上传" : "上传视频，由服务器检查处理"}</strong><span>MP4、MOV、WebM；单个文件最大 250MiB</span></div>
               <button type="button" onClick={() => videoInputRef.current?.click()} disabled={locked}>选择视频</button>
               <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" disabled={locked} onChange={(event) => void uploadVideo(event.target.files?.[0])} />
             </div>
-            <p className="video-help">在本站服务器本地转码为 H.264 / AAC MP4，CRF 22；横屏最高 1920 × 1080，竖屏最高 1080 × 1920，不放大小尺寸视频。临时原始文件在处理成功或失败后都会删除，仅保留压缩完成的视频；失败后需重新上传。公开页面仅展示压缩完成的视频。发布项目仍需图片封面。</p>
+            {videoTask && <div className="video-local-progress" role="status" aria-live="polite">
+              <span>{videoTask.phase === "compressing" ? `本地压缩中 ${Math.floor(videoTask.progress * 100)}% · 尚未上传` : "正在上传，请稍候"}</span>
+              {videoTask.phase === "compressing" && <progress value={videoTask.progress} max={1} aria-label="浏览器压缩进度" />}
+              <button type="button" onClick={() => videoAbort.current?.abort()}>取消{videoTask.phase === "compressing" ? "压缩" : "上传"}</button>
+            </div>}
+            <p className="video-help">输出 H.264 / AAC MP4，最高 30fps；横屏最高 1920 × 1080，竖屏最高 1080 × 1920，不放大小尺寸视频。服务器会检查所有上传内容，符合格式、尺寸和码率限制的视频仅无损整理封装，不再次有损压缩。原片与临时文件在处理成功或失败后删除。</p>
+            <p className="video-help">浏览器模式面向 Windows / macOS 当前版 Chrome，实际检查本机编解码能力；压缩失败或取消时不会自动上传原片，也不会自动切换模式。需手动选择服务器处理后重新选文件。浏览器目标码率最高约 4 Mbps，音频 128 kbps，与服务器 CRF 22 的质量和体积不保证相同。视频最长 10 分钟，输入最高 4K / 120fps；公开页面仅展示处理完成的视频，发布仍需图片封面。<a href="/licenses/mediabunny-NOTICE.txt" target="_blank" rel="noopener noreferrer">压缩组件许可与源码</a></p>
             {videoPollError && pendingVideos && <p className="video-poll-error" role="status">{videoPollError}</p>}
             {selected.videos?.length ? (
               <div className="admin-video-grid">
@@ -603,7 +654,7 @@ export function AdminPage() {
                   </article>
                 ))}
               </div>
-            ) : <div className="empty-library"><Video aria-hidden="true" /><h3>还没有视频</h3><p>视频为可选内容，上传后会自动压缩并显示在项目详情页。</p></div>}
+            ) : <div className="empty-library"><Video aria-hidden="true" /><h3>还没有视频</h3><p>视频为可选内容，验证与处理完成后显示在项目详情页。</p></div>}
           </section>
         )}
       </section>

@@ -1,0 +1,11 @@
+This application bundles unmodified Mediabunny 1.61.0 in its local video-compression worker.
+Copyright (c) 2026-present, Vanilagy and contributors.
+Mediabunny is licensed under the Mozilla Public License, version 2.0.
+The complete license is supplied alongside this notice as mediabunny-MPL-2.0.txt.
+
+The corresponding Source Code Form is available free of charge at:
+https://github.com/Vanilagy/mediabunny/tree/v1.61.0
+https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.0.tgz
+The npm archive contains the original src/ TypeScript sources and LICENSE.
+This application does not modify those source files; Vite bundles and minifies them.
+No connection to these source links is made during video compression.

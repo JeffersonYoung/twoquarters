@@ -24,9 +24,18 @@ try {
    db.exec('BEGIN IMMEDIATE');
    try {
     checkSchema(db,{legacy:true});
-    if(db.prepare('PRAGMA user_version').get().user_version===0){
+    let version=db.prepare('PRAGMA user_version').get().user_version;
+    if(version===0){
      db.exec("UPDATE projects SET data=json_set(data,'$.category','fmcg') WHERE json_extract(data,'$.category')='fashion'");
-     db.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+     db.exec('PRAGMA user_version=1');
+     version=1;
+    }
+    if(version===1){
+     // Explicit versioned migration only. Existing queued uploads preserve the
+     // established server fallback; browser-mode jobs persist their chosen mode.
+     checkSchema(db,{legacy:true});
+     db.exec("ALTER TABLE videos ADD COLUMN compression_mode TEXT NOT NULL DEFAULT 'server'");
+     db.exec('PRAGMA user_version=2');
     }
     checkSchema(db);db.exec('COMMIT');
    } catch(e){db.exec('ROLLBACK');throw e;}

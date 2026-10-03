@@ -29,6 +29,7 @@ const project = {
 function loadSource(entry, { admin = false, fixture = project, search = "" } = {}) {
   const cache = new Map();
   const stubs = new Map([
+    [path.join(root, 'lib/video-compression'), { compressVideo: async () => { throw new Error('Not invoked by static image rendering'); } }],
     [path.join(root, 'router'), {
       Link: ({ to, children, ...props }) => React.createElement('a', { href: to, ...props }, children),
       Navigate: () => null,

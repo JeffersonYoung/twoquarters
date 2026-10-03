@@ -19,10 +19,10 @@ export class ApiError extends Error {
   }
 }
 
-async function api<T>(path: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
+async function api<T>(path: string, method = "GET", body?: unknown, signal?: AbortSignal, extraHeaders?: HeadersInit): Promise<T> {
   const form = body instanceof FormData;
   const file = body instanceof File;
-  const headers = new Headers();
+  const headers = new Headers(extraHeaders);
   if (body !== undefined && !form && !file) headers.set("Content-Type", "application/json");
   if (file) {
     headers.set("Content-Type", body.type || "application/octet-stream");
@@ -90,8 +90,9 @@ export const deleteProjectImage = (project: AdminProject, image: ProjectImage) =
   api(`/admin/projects/${encodeURIComponent(project.id)}/images/${encodeURIComponent(image.id || "")}`, "DELETE");
 export const deleteProject = (project: AdminProject) => api(`/admin/projects/${encodeURIComponent(project.id)}`, "DELETE");
 
-export const uploadProjectVideo = (project: AdminProject, file: File) =>
-  api<AdminProject>(`/admin/projects/${encodeURIComponent(project.id)}/videos`, "POST", file);
+export type VideoCompressionMode = "server" | "browser";
+export const uploadProjectVideo = (project: AdminProject, file: File, mode: VideoCompressionMode = "server", signal?: AbortSignal) =>
+  api<AdminProject>(`/admin/projects/${encodeURIComponent(project.id)}/videos`, "POST", file, signal, { "X-Video-Compression": mode });
 export const deleteProjectVideo = (project: AdminProject, video: ProjectVideo) =>
   api<AdminProject>(`/admin/projects/${encodeURIComponent(project.id)}/videos/${encodeURIComponent(video.id)}`, "DELETE");
 

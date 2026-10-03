@@ -59,6 +59,11 @@ test('frontend API session, mutation, and recovery contract', async t => {
     await client.uploadProjectImages(fixture, [new File(['fixture'], 'fixture.jpg', { type: 'image/jpeg' })]);
     await client.deleteProjectImage(fixture, { id: 'image fixture' });
     await client.uploadProjectVideo(fixture, new File(['test video'], '测试 clip.mp4', { type: 'video/mp4' }));
+    const controller = new AbortController();
+    await client.uploadProjectVideo(fixture, new File(['compressed'], 'compressed.mp4', { type: 'video/mp4' }), 'browser', controller.signal);
+    const compressedRequest = requests.at(-1);
+    assert.equal(compressedRequest.options.headers.get('X-Video-Compression'), 'browser');
+    assert.equal(compressedRequest.options.signal, controller.signal);
     await client.deleteProjectVideo(fixture, { id: 'video fixture' });
     await client.deleteProject(fixture);
     await client.listAdminProjects();
@@ -73,6 +78,7 @@ test('frontend API session, mutation, and recovery contract', async t => {
     const video = requests.find(({ options }) => options.body instanceof File);
     assert.ok(video);
     assert.equal(video.options.headers.get('Content-Type'), 'video/mp4');
+    assert.equal(video.options.headers.get('X-Video-Compression'), 'server');
     assert.equal(video.options.headers.get('X-Upload-Name'), encodeURIComponent('测试 clip.mp4'));
     assert.ok(requests.some(({ url }) => url.includes('test%20id/videos/video%20fixture')));
     assert.equal(upload.options.headers.has('Content-Type'), false, 'browser must supply the multipart boundary');

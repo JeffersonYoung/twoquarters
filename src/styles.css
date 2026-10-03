@@ -2167,3 +2167,11 @@ main {
 }
 
 @media (max-width: 640px) { .project-watch-page .project-facts { margin-bottom: 24px; } }
+
+.video-compression-options { display: flex; flex-wrap: wrap; gap: 12px 24px; border: 1px solid var(--line, #ddd); padding: 16px; margin: 0 0 16px; }
+.video-compression-options legend { padding: 0 6px; font-size: 13px; }
+.video-compression-options label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.video-compression-options input { width: auto; }
+.video-local-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; font-size: 13px; }
+.video-local-progress progress { flex: 1; min-width: 100px; }
+.video-local-progress button { border: 1px solid currentColor; padding: 8px 12px; background: transparent; cursor: pointer; }

@@ -13,6 +13,16 @@ const file = (id, suffix) => path.join(dataDir, 'uploads', `video-${id}.${suffix
 const remove = p => unlink(p).catch(error => { if (error.code !== 'ENOENT') throw error; });
 const find = id => db.prepare('SELECT * FROM videos WHERE id=?').get(id);
 const DISK_RESERVE = VIDEO_DISK_RESERVE;
+// Copy/browser eligibility limits are aligned with the browser compressor and
+// allow modest overhead above its 4 Mbps / 128 kbps targets. Server CRF output
+// remains quality-based and may exceed these bitrate caps, especially on short clips.
+const MAX_VIDEO_BITRATE = 4_500_000, MAX_AUDIO_BITRATE = 160_000;
+const MAX_OUTPUT_BITRATE = MAX_VIDEO_BITRATE + MAX_AUDIO_BITRATE + 128_000;
+const PROCESS_TIMEOUT = 15 * 60 * 1000;
+const rate = value => {
+ const [n, d = 1] = String(value).split(/[/:]/).map(Number);
+ return Number.isFinite(n / d) ? n / d : NaN;
+};
 function ensureDiskSpace(additional = 0) {
  const active = db.prepare("SELECT count(*) AS n FROM videos WHERE status IN ('uploading','queued','processing')").get().n;
  const disk = statfsSync(path.join(dataDir,'uploads'));
@@ -30,36 +40,151 @@ export function projectVideos(p, admin = false) {
   ...(admin ? { error: v.error, sourceBytes: v.source_bytes, outputBytes: v.output_bytes } : {}),
  })) };
 }
-function command(bin, args, timeout = 30000) {
+function command(bin, args, timeout = 30000, consume) {
  return new Promise((resolve, reject) => {
   const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   activeProcess = child;
-  let out = '', err = '', tooLarge = false;
-  const timer = setTimeout(() => child.kill('SIGKILL'), timeout);
-  child.stdout.on('data', data => { out += data; if (out.length > 1024 * 1024) { tooLarge = true; child.kill('SIGKILL'); } });
+  let out = '', err = '', failure;
+  const timer = setTimeout(() => { failure = new Error(`${bin} timed out`); child.kill('SIGKILL'); }, timeout);
+  child.stdout.on('data', data => {
+   try {
+    if (consume) consume(String(data));
+    else { out += data; if (out.length > 1024 * 1024) throw new Error('Probe output exceeded limit'); }
+   } catch (error) { failure = error; child.kill('SIGKILL'); }
+  });
   child.stderr.on('data', data => { err = (err + data).slice(-8192); });
-  child.on('error', reject);
+  child.on('error', error => { failure = error; });
   child.on('close', code => {
    clearTimeout(timer); if (activeProcess === child) activeProcess = undefined;
-   if (code === 0 && !tooLarge) resolve(out); else reject(new Error(`${bin} failed (${code}): ${err}`));
+   // Every caller uses loglevel=error. A partial probe can exit zero while still
+   // reporting malformed packets, which must not be accepted as valid media.
+   if (code === 0 && !failure && !err.trim()) resolve(out);
+   else reject(failure || new Error(`${bin} failed (${code}): ${err}`));
   });
  });
 }
-async function inspect(id, type) {
- const source = file(id, 'source');
+async function probe(source, demuxer) {
+ return JSON.parse(await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',demuxer,
+  '-threads','2','-show_streams','-show_format','-of','json',source]));
+}
+async function inspectBmff(source, size) {
+ // ffprobe may tolerate a truncated trailing moov/metadata box. Validate top-level
+ // lengths ourselves before either decoding or accepting a lossless copy.
+ const handle = await open(source,'r'), header = Buffer.alloc(16);
+ let offset = 0, boxes = 0, movie = 0, media = 0, brand;
+ try {
+  while (offset < size) {
+   if (++boxes > 10000 || size-offset < 8) throw new Error('Invalid MP4 boxes');
+   const { bytesRead } = await handle.read(header,0,16,offset);
+   let length = header.readUInt32BE(0), headerLength = 8;
+   const type = header.toString('ascii',4,8);
+   if (length === 1) {
+    if (bytesRead < 16) throw new Error('Invalid MP4 extended box');
+    const extended = header.readBigUInt64BE(8);
+    if (extended > BigInt(size)) throw new Error('Invalid MP4 box size');
+    length = Number(extended); headerLength = 16;
+   } else if (length === 0) length = size-offset;
+   if (length < headerLength || length > size-offset) throw new Error('Truncated MP4 box');
+   if (offset === 0) {
+    if (type !== 'ftyp' || headerLength !== 8 || length < 16) throw new Error('Invalid MP4 signature');
+    brand = header.toString('ascii',8,12);
+   }
+   if (type === 'moov') movie++;
+   if (type === 'mdat') media++;
+   offset += length;
+  }
+ } finally { await handle.close(); }
+ if (movie !== 1 || !media) throw new Error('Missing MP4 media');
+ return /^(isom|iso[2-9]|mp4[12]|avc1|M4V |dash)$/.test(brand);
+}
+async function inspect(id, type, suffix = 'source') {
+ const source = file(id, suffix), size = (await stat(source)).size;
+ if (!size || size > MAX_VIDEO_BYTES) throw new Error('Unsupported file size');
  const handle = await open(source, 'r'); const magic = Buffer.alloc(16);
  try { await handle.read(magic, 0, 16, 0); } finally { await handle.close(); }
  const webm = type === 'video/webm';
  if (webm ? !magic.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])) : magic.toString('ascii',4,8) !== 'ftyp') throw new Error('Invalid container');
  // Force a container demuxer: never allow playlists or arbitrary protocol auto-detection.
- const info = JSON.parse(await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',webm?'matroska':'mov','-threads','2','-show_streams','-show_format','-of','json',source]));
+ const mp4 = webm ? false : await inspectBmff(source,size);
+ const demuxer = webm ? 'matroska' : 'mov', info = await probe(source, demuxer);
  const streams = info.streams || [], video = streams.find(s => s.codec_type === 'video' && !s.disposition?.attached_pic);
  const duration = Number(info.format?.duration);
  if (!video || streams.length > 8 || !Number.isFinite(duration) || duration <= 0 || duration > 600 ||
-  !video.width || !video.height || Math.max(video.width,video.height) > 4096 || video.width * video.height > 8847360) throw new Error('Unsupported dimensions or duration');
- const [n,d] = String(video.avg_frame_rate).split('/').map(Number);
- if (!Number.isFinite(n/d) || n/d <= 0 || n/d > 120) throw new Error('Unsupported frame rate');
- return { video, duration, demuxer: webm?'matroska':'mov' };
+  !Number.isInteger(video.width) || !Number.isInteger(video.height) || video.width < 2 || video.height < 2 ||
+  Math.max(video.width,video.height) > 4096 || video.width * video.height > 8847360) throw new Error('Unsupported dimensions or duration');
+ const fps = rate(video.avg_frame_rate);
+ if (!Number.isFinite(fps) || fps <= 0 || fps > 120) throw new Error('Unsupported frame rate');
+ for (const stream of streams) {
+  if (stream.duration !== undefined && (!Number.isFinite(Number(stream.duration)) || Number(stream.duration) > 600 || Number(stream.duration) <= 0)) throw new Error('Unsupported stream duration');
+  if (stream.codec_type === 'audio' && (!Number.isInteger(stream.channels) || stream.channels < 1 || stream.channels > 8 || Number(stream.sample_rate) > 192000)) throw new Error('Unsupported audio');
+ }
+ return { video, streams, duration, demuxer, size, source, info, mp4 };
+}
+function outputShape(media) {
+ const { video, streams, mp4 } = media;
+ const audio = streams.filter(stream => stream.codec_type === 'audio');
+ const frameRate = rate(video.avg_frame_rate), nominalRate = rate(video.r_frame_rate);
+ const aspect = video.sample_aspect_ratio;
+ // An absent SAR uses H.264's square-pixel default; explicit unknown or
+ // non-square values are not compliant. Transform matrices,
+ // extra tracks and non-MP4 containers go through the server normalization path.
+ return mp4 && streams.length === 1 + audio.length && audio.length <= 1 &&
+  video.codec_name === 'h264' && video.pix_fmt === 'yuv420p' && video.width % 2 === 0 && video.height % 2 === 0 &&
+  Math.max(video.width,video.height) <= 1920 && Math.min(video.width,video.height) <= 1080 &&
+  (aspect === '1:1' || aspect === undefined) && (!video.field_order || ['progressive','unknown'].includes(video.field_order)) &&
+  !video.tags?.rotate && !video.side_data_list?.some(item => item.side_data_type === 'Display Matrix' || item.rotation !== undefined) &&
+  frameRate > 0 && frameRate <= 30 && nominalRate > 0 && nominalRate <= 30 &&
+  audio.every(stream => stream.codec_name === 'aac' && ['LC', undefined].includes(stream.profile) && stream.channels <= 2 &&
+   Number(stream.sample_rate) > 0 && Number(stream.sample_rate) <= 48000);
+}
+function withinCopyBitrateLimits(media) {
+ // Eligibility to skip encoding is separate from validating server-normalized
+ // output: valid CRF22 media can have high short-clip or complex-scene bitrate.
+ const streamRate = stream => stream.bit_rate === undefined ? 0 : Number(stream.bit_rate);
+ return media.size * 8 / media.duration <= MAX_OUTPUT_BITRATE && media.streams.every(stream =>
+  streamRate(stream) >= 0 && streamRate(stream) <= (stream.codec_type === 'video' ? MAX_VIDEO_BITRATE : MAX_AUDIO_BITRATE));
+}
+async function packetLimits(media) {
+ // Measure packet payloads instead of trusting a client flag or missing/forged
+ // bitrate metadata. Streaming aggregation keeps even a 10-minute probe bounded.
+ const totals = new Map(media.streams.map(stream => [stream.index, { bytes: 0, count: 0, first: Infinity, last: -Infinity }]));
+ let pending = '', packets = 0;
+ const consume = chunk => {
+  pending += chunk;
+  let newline;
+  while ((newline = pending.indexOf('\n')) !== -1) {
+   const line = pending.slice(0,newline); pending = pending.slice(newline+1);
+   if (!line) continue;
+   const values = Object.fromEntries(line.split('|').map(field => field.split('=')));
+   const total = totals.get(Number(values.stream_index));
+   const size = Number(values.size), start = Number(values.pts_time), duration = Number(values.duration_time);
+   if (!total || !Number.isSafeInteger(size) || size <= 0 || !Number.isFinite(start) || !Number.isFinite(duration) || duration <= 0 || ++packets > 200000) throw new Error('Invalid media packets');
+   total.bytes += size; total.count++;
+   total.first = Math.min(total.first,start); total.last = Math.max(total.last,start+duration);
+   if (total.bytes > media.size || total.last-total.first > 600.25) throw new Error('Invalid media timeline');
+  }
+  if (pending.length > 8192) throw new Error('Invalid packet probe');
+ };
+ await command('ffprobe', ['-v','error','-protocol_whitelist','file','-f',media.demuxer,'-threads','2',
+  '-show_packets','-show_entries','packet=stream_index,size,pts_time,duration_time','-of','compact=p=0:nk=0',media.source],30000,consume);
+ if (pending.trim()) consume('\n');
+ return media.streams.every(stream => {
+  const total = totals.get(stream.index), span = total.last-total.first;
+  return total.count > 0 && span > 0 && span <= 600.25 &&
+   Math.abs(span - Number(stream.duration || media.duration)) <= 0.25 &&
+   total.bytes * 8 / span <= (stream.codec_type === 'video' ? MAX_VIDEO_BITRATE : MAX_AUDIO_BITRATE) &&
+   (stream.codec_type !== 'video' || total.count / span <= 30.001);
+ });
+}
+async function validateCopy(id, media) {
+ // Remuxing does not decode. Fully decode the bounded output once so corrupt
+ // codec payloads cannot reach ready status, but never encode a compliant input.
+ const progress = await command('ffmpeg', ['-hide_banner','-loglevel','error','-nostdin','-xerror','-err_detect','explode',
+  '-protocol_whitelist','file','-f','mov','-threads','2','-i',file(id,'partial'),'-map','0:v:0','-map','0:a:0?',
+  '-threads','2','-filter_threads','1','-progress','pipe:1','-nostats','-f','null','-'],PROCESS_TIMEOUT);
+ const times = [...progress.matchAll(/^out_time_us=(\d+)$/gm)].map(match => Number(match[1]) / 1e6);
+ const decoded = times.at(-1);
+ if (!Number.isFinite(decoded) || decoded < media.duration-0.25 || decoded > 600.25) throw new Error('Invalid decoded timeline');
 }
 async function processQueue() {
  if (running || stopping) return;
@@ -72,29 +197,43 @@ async function processQueue() {
    db.prepare("UPDATE videos SET status='processing',error=NULL WHERE id=?").run(v.id);
    try {
     ensureDiskSpace();
-    const { video, duration, demuxer } = await inspect(v.id, v.input_type);
+    const input = await inspect(v.id, v.input_type);
+    const { video, duration, demuxer } = input;
     if (!find(v.id) || stopping) continue;
-    // Account for pixel aspect ratio; retain orientation; cap long/short edges at 1920/1080.
-    const factor = 'min(1,min(1920/max(iw*sar,ih),1080/min(iw*sar,ih)))';
-    const filter = `scale=w='max(2,trunc(iw*sar*${factor}/2)*2)':h='max(2,trunc(ih*${factor}/2)*2)',setsar=1`;
-    await command('ffmpeg', ['-hide_banner','-loglevel','error','-nostdin','-y','-xerror','-protocol_whitelist','file',
+    const copy = outputShape(input) && withinCopyBitrateLimits(input) && await packetLimits(input);
+    if (!copy && v.compression_mode === 'browser') throw new Error('Browser output does not meet compression requirements');
+    if (!find(v.id) || stopping) continue;
+    const common = ['-hide_banner','-loglevel','error','-nostdin','-y','-xerror','-protocol_whitelist','file',
      '-f',demuxer,'-threads','2','-i',file(v.id,'source'),'-map',`0:${video.index}`,'-map','0:a:0?',
-     '-map_metadata','-1','-map_chapters','-1','-sn','-dn','-vf',filter,'-filter_threads','1',
-     '-c:v','libx264','-threads','2','-preset','fast','-crf','22','-pix_fmt','yuv420p','-fpsmax','30',
-     '-c:a','aac','-b:a','128k','-ac','2','-ar','48000','-t','600','-fs',String(MAX_VIDEO_BYTES),
-     '-movflags','+faststart','-f','mp4',file(v.id,'partial')], 15*60*1000);
-    if (!find(v.id)) continue;
-    const output = JSON.parse(await command('ffprobe',['-v','error','-protocol_whitelist','file','-f','mov','-show_streams','-show_format','-of','json',file(v.id,'partial')]));
-    const stream = output.streams.find(s=>s.codec_type==='video'), size = (await stat(file(v.id,'partial'))).size;
-    if (!stream || stream.codec_name!=='h264' || !size || size >= MAX_VIDEO_BYTES || !Number.isFinite(Number(output.format.duration)) || Number(output.format.duration) < duration - 0.25) throw new Error('Invalid output');
+     '-map_metadata','-1','-map_chapters','-1','-sn','-dn'];
+    if (copy) {
+     // Only the container changes: faststart + metadata removal, codec packets
+     // preserved for browser output AND already-compliant original uploads.
+     await command('ffmpeg', [...common,'-c','copy','-movflags','+faststart','-f','mp4',file(v.id,'partial')],60000);
+    } else {
+     // Account for pixel aspect ratio; retain orientation; cap long/short edges.
+     const factor = 'min(1,min(1920/max(iw*sar,ih),1080/min(iw*sar,ih)))';
+     const filter = `scale=w='max(2,trunc(iw*sar*${factor}/2)*2)':h='max(2,trunc(ih*${factor}/2)*2)',setsar=1`;
+     await command('ffmpeg', [...common,'-vf',filter,'-filter_threads','1',
+      '-c:v','libx264','-threads','2','-preset','fast','-crf','22','-pix_fmt','yuv420p','-fpsmax','30',
+      '-c:a','aac','-b:a','128k','-ac','2','-ar','48000','-t','600','-fs',String(MAX_VIDEO_BYTES),
+      '-movflags','+faststart','-f','mp4',file(v.id,'partial')],PROCESS_TIMEOUT);
+    }
+    if (!find(v.id) || stopping) continue;
+    const output = await inspect(v.id,'video/mp4','partial');
+    const stream = output.video, size = output.size;
+    if (!outputShape(output) || (copy && !withinCopyBitrateLimits(output)) || output.duration < duration - 0.25) throw new Error('Invalid output');
+    if (copy) await validateCopy(v.id, output);
     if (!find(v.id)) continue;
     await rename(file(v.id,'partial'),file(v.id,'mp4'));
     if (!find(v.id)) { await remove(file(v.id,'mp4')); continue; }
     await remove(file(v.id,'source'));
-    db.prepare("UPDATE videos SET status='ready',output_bytes=?,width=?,height=?,duration=?,error=NULL WHERE id=?").run(size,stream.width,stream.height,Number(output.format.duration),v.id);
+    db.prepare("UPDATE videos SET status='ready',output_bytes=?,width=?,height=?,duration=?,error=NULL WHERE id=?").run(size,stream.width,stream.height,output.duration,v.id);
    } catch (error) {
     await Promise.all(['source','partial','mp4'].map(s=>remove(file(v.id,s))));
-    if (!stopping) db.prepare("UPDATE videos SET status='failed',error=? WHERE id=?").run('视频处理失败；临时原片已清理，请重新上传有效 MP4 / MOV / WebM（最长 10 分钟、最高 4K / 120fps），或检查服务器 FFmpeg 与磁盘空间。',v.id);
+    if (!stopping) db.prepare("UPDATE videos SET status='failed',error=? WHERE id=?").run(v.compression_mode === 'browser'
+     ? '浏览器压缩结果不符合要求或文件损坏；临时文件已清理。请重新压缩，或选择服务器压缩后重新上传。'
+     : '视频处理失败；临时原片已清理，请重新上传有效 MP4 / MOV / WebM（最长 10 分钟、最高 4K / 120fps），或检查服务器 FFmpeg 与磁盘空间。',v.id);
     console.error(`Video processing failed: ${v.id}: ${error.message}`);
    } finally {
     activeId = undefined;
@@ -122,6 +261,8 @@ export async function stopVideoQueue() {
 }
 export async function uploadVideo(req, projectId) {
  if (stopping) fail('服务器正在重启，请稍后重试',503);
+ const mode = req.headers['x-video-compression'] ?? 'server';
+ if (!['browser','server'].includes(mode)) fail('视频压缩模式不正确');
  const type = String(req.headers['content-type'] || '').split(';')[0];
  if (!['video/mp4','video/webm','video/quicktime'].includes(type)) fail('仅支持 MP4、MOV 或 WebM 视频',415);
  const length = Number(req.headers['content-length']);
@@ -132,7 +273,7 @@ export async function uploadVideo(req, projectId) {
  name = path.basename(name).replace(/[\x00-\x1f\x7f]/g,'').slice(0,160) || 'video';
  const id = randomUUID(); let handle, complete = false; uploading++;
  try {
-  db.prepare('INSERT INTO videos(id,project_id,name,status,input_type,created) VALUES(?,?,?,?,?,?)').run(id,projectId,name,'uploading',type,Date.now());
+  db.prepare('INSERT INTO videos(id,project_id,name,status,input_type,created,compression_mode) VALUES(?,?,?,?,?,?,?)').run(id,projectId,name,'uploading',type,Date.now(),mode);
   uploadRequests.set(id,req);
   handle = await open(file(id,'source'),'wx',0o600); let size = 0;
   if (!find(id) || req.destroyed) fail('上传已取消',409);

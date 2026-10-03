@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -13,7 +13,7 @@ import sharp from 'sharp';
 // No shared database, fixed passwords, checked-in media, or network services.
 const cwd = process.cwd(), origin = 'http://127.0.0.1:3199';
 const details = { title: 'Video integration fixture', titleEn: 'Video test', category: 'bts', year: '2026', published: false };
-let child, directory, dataDir, cookie, csrf, serverLog = '';
+let child, directory, dataDir, cookie, csrf, toolDir, ffmpegLog, serverLog = '';
 
 async function command(binary, args, options = {}) {
   const p = spawn(binary, args, { cwd, ...options, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -43,11 +43,11 @@ async function createProject() {
   return response.json();
 }
 async function upload(id, bytes, type = 'video/mp4', name = 'fixture.mp4', options = {}) {
-  return request(`/api/admin/projects/${id}/videos`, { method: 'POST', body: bytes, headers: { 'Content-Type': type, 'X-Upload-Name': encodeURIComponent(name) }, ...options });
+  return request(`/api/admin/projects/${id}/videos`, { method: 'POST', body: bytes, ...options, headers: { 'Content-Type': type, 'X-Upload-Name': encodeURIComponent(name), ...options.headers } });
 }
-async function accepted(id, bytes, type, name) {
+async function accepted(id, bytes, type, name, options) {
   const before = new Set((await project(id)).videos.map(v => v.id));
-  const response = await upload(id, bytes, type, name);
+  const response = await upload(id, bytes, type, name, options);
   assert.equal(response.status, 202, await response.clone().text());
   const p = await response.json(), video = p.videos.find(v => !before.has(v.id));
   assert.ok(video, 'upload response contains the new video');
@@ -73,7 +73,7 @@ async function assertFiles(id, expected) {
   assert.deepEqual(await videoFiles(id), expected, 'original and intermediate files must be deleted');
 }
 async function start() {
-    child = spawn(process.execPath, ['server/index.mjs'], { cwd, env: { ...process.env, DATA_DIR: dataDir, PORT: '3199', HOST: '127.0.0.1', APP_ORIGIN: origin, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    child = spawn(process.execPath, ['server/index.mjs'], { cwd, env: { ...process.env, PATH: toolDir + path.delimiter + process.env.PATH, DATA_DIR: dataDir, PORT: '3199', HOST: '127.0.0.1', APP_ORIGIN: origin, NODE_ENV: 'test' }, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stderr.on('data', b => serverLog += b); child.stdout.on('data', b => serverLog += b);
     let started = false;
     for (let i = 0; i < 100; i++) {
@@ -97,6 +97,11 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
   directory = await mkdtemp(path.join(tmpdir(), 'tq-video-'));
   dataDir = path.join(directory, 'data');
   const fixtureDir = path.join(directory, 'fixtures'); await mkdir(fixtureDir);
+  toolDir = path.join(directory,'bin'); await mkdir(toolDir);
+  ffmpegLog = path.join(directory,'ffmpeg.log'); await writeFile(ffmpegLog,'');
+  const realFfmpeg = (await command('which',['ffmpeg'])).trim();
+  await writeFile(path.join(toolDir,'ffmpeg'), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${ffmpegLog}'\nexec '${realFfmpeg}' "$@"\n`);
+  await chmod(path.join(toolDir,'ffmpeg'),0o700);
   const mp4Path = path.join(fixtureDir, 'landscape.mp4'), webmPath = path.join(fixtureDir, 'portrait.webm');
   try {
     await command('ffmpeg', ['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=2560x1440:rate=12','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','0.5','-c:v','mpeg4','-q:v','2','-threads','2','-c:a','aac',mp4Path]);
@@ -119,6 +124,9 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
     });
     await t.test('rejects unsupported type, empty body, malformed filename, and oversized declared body', async () => {
       assert.equal((await upload(p.id, mp4, 'application/octet-stream')).status, 415);
+      for (const mode of ['true','none','Browser','browser, server']) {
+        assert.equal((await upload(p.id, mp4, 'video/mp4', 'x.mp4', { headers: { 'X-Video-Compression': mode } })).status, 400);
+      }
       assert.equal((await upload(p.id, Buffer.alloc(0))).status, 400);
       assert.equal((await upload(p.id, mp4, 'video/mp4', 'x', { headers: { 'Content-Type': 'video/mp4', 'X-Upload-Name': '%ZZ' } })).status, 400);
       const status = await new Promise((resolve, reject) => {
@@ -164,6 +172,157 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
       assert.equal(info.streams.find(s => s.codec_type === 'video').codec_name, 'h264');
       assert.equal(info.streams.find(s => s.codec_type === 'audio').codec_name, 'aac');
       await assertFiles(v.id, [`video-${v.id}.mp4`]);
+    });
+    await t.test('compliant originals and browser output preserve video/audio packets without invoking an encoder', async () => {
+      const separate = await createProject(), input = path.join(fixtureDir,'compliant.mp4');
+      await command('ffmpeg', ['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=320x180:rate=25',
+        '-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1','-c:v','libx264','-threads','2','-crf','26',
+        '-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-metadata','comment=private upload metadata',input]);
+      const original = await readFile(input);
+      const hashes = async filename => {
+        const info = JSON.parse(await command('ffprobe',['-v','error','-show_packets','-show_data_hash','sha256',
+          '-show_entries','packet=codec_type,stream_index,data_hash','-of','json',filename]));
+        return info.packets.map(packet => [packet.codec_type,packet.stream_index,packet.data_hash]);
+      };
+      const expected = await hashes(input);
+      for (const mode of [undefined,'server','browser']) {
+        const beforeLog = (await readFile(ffmpegLog,'utf8')).length;
+        const v = await accepted(separate.id,original,'video/mp4','original.mp4',mode ? { headers: { 'X-Video-Compression': mode } } : undefined);
+        const ready = await terminal(separate.id,v.id);
+        assert.equal(ready.status,'ready',`${mode}: ${ready.error}`);
+        const output = path.join(dataDir,'uploads',`video-${v.id}.mp4`);
+        assert.deepEqual(await hashes(output),expected,`${mode || 'legacy'} must preserve all encoded packets`);
+        const commands = (await readFile(ffmpegLog,'utf8')).slice(beforeLog);
+        assert.match(commands,/-c copy/, 'compliant input uses lossless stream copy');
+        assert.doesNotMatch(commands,/libx264| -c:a aac/, 'no media encoder is invoked for compliant input');
+        assert.match(commands,/-f null/, 'copy path fully decodes media for validation');
+        const bytes = await readFile(output);
+        assert.ok(bytes.indexOf(Buffer.from('moov')) < bytes.indexOf(Buffer.from('mdat')), 'copy path adds faststart');
+        assert.equal((await stat(output)).mode & 0o077,0);
+        const info = JSON.parse(await command('ffprobe',['-v','error','-show_format','-of','json',output]));
+        assert.equal(info.format.tags?.comment,undefined,'private metadata removed during remux');
+        const db = new DatabaseSync(path.join(dataDir,'portfolio.sqlite'));
+        try { assert.equal(db.prepare('SELECT compression_mode FROM videos WHERE id=?').get(v.id).compression_mode,mode || 'server'); }
+        finally { db.close(); }
+        await assertFiles(v.id,[`video-${v.id}.mp4`]);
+      }
+      const silent = path.join(fixtureDir,'silent-portrait.mp4');
+      await command('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=120x200:rate=30',
+        '-t','0.5','-c:v','libx264','-threads','2','-pix_fmt','yuv420p',silent]);
+      const v = await accepted(separate.id,await readFile(silent),'video/mp4','silent.mp4',{ headers: { 'X-Video-Compression': 'browser' } });
+      const ready = await terminal(separate.id,v.id); assert.equal(ready.status,'ready',ready.error);
+      assert.deepEqual(await hashes(path.join(dataDir,'uploads',`video-${v.id}.mp4`)),await hashes(silent));
+      assert.equal(ready.width,120); assert.equal(ready.height,200);
+      await request(`/api/admin/projects/${separate.id}`,{ method:'DELETE' });
+    });
+    await t.test('browser mode cannot bypass actual container, codec, dimensions, rate, bitrate, aspect, or corruption validation', async () => {
+      const separate = await createProject();
+      const options = { headers: { 'X-Video-Compression':'browser' } };
+      const reject = async (bytes,name,type='video/mp4') => {
+        const beforeLog = (await readFile(ffmpegLog,'utf8')).length;
+        const v = await accepted(separate.id,bytes,type,name,options);
+        const failed = await terminal(separate.id,v.id);
+        assert.equal(failed.status,'failed',name); assert.match(failed.error,/服务器压缩/);
+        assert.equal((await request(v.src)).status,404); await assertFiles(v.id,[]);
+        assert.doesNotMatch((await readFile(ffmpegLog,'utf8')).slice(beforeLog),/libx264/,'browser mode never silently falls back to encoding');
+      };
+      await reject(mp4,'uncompressed.mp4');
+      await reject(webm,'not-mp4.webm','video/webm');
+      await reject(webm,'spoofed.mp4');
+      for (const [name,source,extra] of [
+        ['dimensions','color=size=1922x1080:rate=25',[]],
+        ['frame-rate','color=size=64x64:rate=31',[]],
+        ['aspect','color=size=64x64:rate=25',['-vf','setsar=2']],
+        ['bitrate','testsrc2=size=1280x720:rate=30',['-qp','0']],
+        ['pixel-format','color=size=64x64:rate=25',['-pix_fmt','yuv444p']],
+      ]) {
+        const sourcePath = path.join(fixtureDir,`browser-${name}.mp4`);
+        await command('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i',source,'-t','1',
+          '-c:v','libx264','-threads','2',...extra,sourcePath]);
+        await reject(await readFile(sourcePath),name+'.mp4');
+      }
+      const audioPath = path.join(fixtureDir,'browser-audio-bitrate.mp4');
+      await command('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=size=64x64:rate=25',
+        '-f','lavfi','-i','anoisesrc=sample_rate=48000','-t','1','-c:v','libx264','-threads','2',
+        '-c:a','aac','-b:a','256k','-ac','2',audioPath]);
+      await reject(await readFile(audioPath),'audio-bitrate.mp4');
+      const quicktimePath = path.join(fixtureDir,'browser-quicktime.mov');
+      await command('ffmpeg',['-hide_banner','-loglevel','error','-i',path.join(fixtureDir,'compliant.mp4'),'-c','copy',quicktimePath]);
+      await reject(await readFile(quicktimePath),'quicktime.mov','video/quicktime');
+      const extraPath = path.join(fixtureDir,'browser-extra-track.mp4');
+      await command('ffmpeg',['-hide_banner','-loglevel','error','-i',path.join(fixtureDir,'compliant.mp4'),'-map','0:v','-map','0:v','-c','copy',extraPath]);
+      await reject(await readFile(extraPath),'extra-track.mp4');
+      const valid = await readFile(path.join(fixtureDir,'compliant.mp4'));
+      const rotated = Buffer.from(valid), track = rotated.indexOf(Buffer.from('tkhd'));
+      [0,-65536,0,65536,0,0,0,0,1073741824].forEach((value,i) => rotated.writeInt32BE(value,track+44+i*4));
+      await reject(rotated,'rotation.mp4');
+      const corrupt = Buffer.from(valid), media = corrupt.indexOf(Buffer.from('mdat'));
+      assert.ok(media > 0); corrupt.fill(0,media+4,Math.min(media+1500,corrupt.length));
+      await reject(corrupt,'corrupt.mp4');
+      await reject(valid.subarray(0,valid.length-32),'truncated.mp4');
+      await request(`/api/admin/projects/${separate.id}`,{ method:'DELETE' });
+    });
+    await t.test('server mode normalizes noncompliant H.264 instead of trusting codec alone', async () => {
+      const separate = await createProject();
+      for (const name of ['bitrate','frame-rate','aspect','audio-bitrate']) {
+        const input = await readFile(path.join(fixtureDir,`browser-${name}.mp4`));
+        const beforeLog = (await readFile(ffmpegLog,'utf8')).length;
+        const v = await accepted(separate.id,input,'video/mp4',name+'.mp4',{ headers:{ 'X-Video-Compression':'server' } });
+        const ready = await terminal(separate.id,v.id); assert.equal(ready.status,'ready',`${name}: ${ready.error}`);
+        assert.match((await readFile(ffmpegLog,'utf8')).slice(beforeLog),/libx264/);
+        const info = JSON.parse(await command('ffprobe',['-v','error','-show_streams','-show_format','-of','json',path.join(dataDir,'uploads',`video-${v.id}.mp4`)]));
+        const video = info.streams.find(stream => stream.codec_type === 'video');
+        const [n,d] = video.avg_frame_rate.split('/').map(Number);
+        assert.ok(n/d <= 30); assert.equal(video.sample_aspect_ratio,'1:1');
+        assert.equal(video.codec_name,'h264');
+        assert.ok(info.streams.filter(stream => stream.codec_type === 'audio').every(stream => stream.codec_name === 'aac' && stream.channels <= 2));
+        await assertFiles(v.id,[`video-${v.id}.mp4`]);
+      }
+      await request(`/api/admin/projects/${separate.id}`,{ method:'DELETE' });
+    });
+    await t.test('server CRF normalization accepts short noisy clips above copy-eligibility bitrate caps', async () => {
+      const separate = await createProject();
+      for (const duration of ['0.2','0.5']) {
+        const input = path.join(fixtureDir,`short-noise-${duration}.mp4`);
+        await command('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i',
+          'color=size=1920x1080:rate=30,noise=alls=100:allf=t+u:all_seed=1234',
+          '-t',duration,'-c:v','libx264','-threads','2','-preset','ultrafast','-crf','10',input]);
+        const v = await accepted(separate.id,await readFile(input),'video/mp4',`noise-${duration}.mp4`,
+          { headers:{ 'X-Video-Compression':'server' } });
+        const ready = await terminal(separate.id,v.id);
+        assert.equal(ready.status,'ready',`${duration}s short noisy original must remain supported: ${ready.error}`);
+        const output = path.join(dataDir,'uploads',`video-${v.id}.mp4`);
+        const info = JSON.parse(await command('ffprobe',['-v','error','-show_streams','-show_format','-of','json',output]));
+        const video = info.streams.find(stream => stream.codec_type === 'video');
+        assert.ok(Number(video.bit_rate) > 4500000,'fixture exercises a legitimate CRF bitrate above skip threshold');
+        assert.equal(video.codec_name,'h264'); assert.equal(video.pix_fmt,'yuv420p');
+        assert.equal(video.width,1920); assert.equal(video.height,1080);
+        assert.ok(Number(info.format.duration) >= Number(duration)-0.025);
+        await assertFiles(v.id,[`video-${v.id}.mp4`]);
+        // The same high-bitrate output is not eligible to masquerade as an
+        // already-compressed browser upload, even though it plays correctly.
+        const strict = await accepted(separate.id,await readFile(output),'video/mp4','claimed-browser.mp4',
+          { headers:{ 'X-Video-Compression':'browser' } });
+        assert.equal((await terminal(separate.id,strict.id)).status,'failed');
+        await assertFiles(strict.id,[]);
+      }
+      await request(`/api/admin/projects/${separate.id}`,{ method:'DELETE' });
+    });
+    await t.test('deleting a processing browser upload cannot retain or publish its source', async () => {
+      const separate = await createProject();
+      const v = await accepted(separate.id,await readFile(path.join(fixtureDir,'compliant.mp4')),'video/mp4','cancel.mp4',
+        { headers:{ 'X-Video-Compression':'browser' } });
+      let current;
+      for (let i=0;i<100;i++) {
+        current = (await project(separate.id)).videos.find(video => video.id === v.id);
+        if (current.status === 'processing') break;
+        assert.notEqual(current.status,'ready'); assert.notEqual(current.status,'failed'); await delay(5);
+      }
+      assert.equal(current.status,'processing');
+      assert.equal((await request(`/api/admin/projects/${separate.id}/videos/${v.id}`,{ method:'DELETE' })).status,200);
+      await assertFiles(v.id,[]); await delay(100); await assertFiles(v.id,[]);
+      assert.equal((await request(v.src)).status,404);
+      await request(`/api/admin/projects/${separate.id}`,{ method:'DELETE' });
     });
     await t.test('MOV rotation metadata becomes correctly oriented pixels with metadata stripped', async () => {
       const rotatedPath = path.join(fixtureDir, 'rotated.mov');
@@ -307,7 +466,7 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
     await t.test('restart removes interrupted/orphan originals and keeps ready output and complete queued jobs', async () => {
       await stop();
       const db = new DatabaseSync(path.join(dataDir, 'portfolio.sqlite'));
-      const interrupted = [randomUUID(), randomUUID()], queued = randomUUID(), orphan = randomUUID();
+      const interrupted = [randomUUID(), randomUUID()], queued = randomUUID(), browserQueued = randomUUID(), browserRejected = randomUUID(), orphan = randomUUID();
       try {
         for (const [i, id] of interrupted.entries()) {
           db.prepare('INSERT INTO videos(id,project_id,name,status,input_type,created) VALUES(?,?,?,?,?,?)').run(id, p.id, 'interrupted fixture', i ? 'processing' : 'uploading', 'video/mp4', Date.now());
@@ -315,6 +474,10 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
         }
         db.prepare('INSERT INTO videos(id,project_id,name,status,input_type,created,source_bytes) VALUES(?,?,?,?,?,?,?)').run(queued, p.id, 'queued fixture', 'queued', 'video/mp4', Date.now(), mp4.length);
         await writeFile(path.join(dataDir,'uploads',`video-${queued}.source`), mp4);
+        for (const [id,bytes] of [[browserQueued,await readFile(path.join(fixtureDir,'compliant.mp4'))],[browserRejected,mp4]]) {
+          db.prepare('INSERT INTO videos(id,project_id,name,status,input_type,created,source_bytes,compression_mode) VALUES(?,?,?,?,?,?,?,?)').run(id,p.id,'browser restart','queued','video/mp4',Date.now(),bytes.length,'browser');
+          await writeFile(path.join(dataDir,'uploads',`video-${id}.source`),bytes);
+        }
         for (const id of [orphan, landscape.id]) for (const suffix of ['source', 'partial']) await writeFile(path.join(dataDir,'uploads',`video-${id}.${suffix}`), mp4);
         await writeFile(path.join(dataDir,'uploads',`video-${orphan}.mp4`), mp4);
       } finally { db.close(); }
@@ -326,6 +489,11 @@ test('video upload, transcode, privacy, byte ranges, and destructive cleanup', {
       assert.equal((await request(landscape.src)).status, 200);
       assert.equal((await terminal(p.id, queued)).status, 'ready');
       await assertFiles(queued, [`video-${queued}.mp4`]);
+      assert.equal((await terminal(p.id,browserQueued)).status,'ready');
+      await assertFiles(browserQueued,[`video-${browserQueued}.mp4`]);
+      const rejected = await terminal(p.id,browserRejected);
+      assert.equal(rejected.status,'failed'); assert.match(rejected.error,/服务器压缩/);
+      await assertFiles(browserRejected,[]);
     });
     await t.test('deleting a project removes ready and failed records and every video file', async () => {
       const ids = (await project(p.id)).videos.map(v => v.id);

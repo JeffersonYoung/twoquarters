@@ -16,10 +16,12 @@
     "images:prepare": "node scripts/prepare-images.mjs",
     "db:init": "node scripts/database.mjs init --maintenance",
     "db:check": "node scripts/database.mjs check",
-    "db:migrate": "node scripts/database.mjs migrate --maintenance"
+    "db:migrate": "node scripts/database.mjs migrate --maintenance",
+    "test:browser-video": "node scripts/test-browser-video.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
+    "mediabunny": "1.61.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sharp": "^0.35.5"
