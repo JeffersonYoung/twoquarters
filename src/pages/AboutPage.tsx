@@ -14,7 +14,7 @@ export function AboutPage() {
   return (
     <main className="page-main about-page">
       <section className="page-intro about-intro">
-        <span>Independent since 1998</span>
+        <span>Independent since 2011</span>
         <h1>我们让图像<br />超越静止。</h1>
         <a href="#about-story" aria-label="继续阅读"><ArrowDownRight aria-hidden="true" /></a>
       </section>
@@ -23,12 +23,12 @@ export function AboutPage() {
         <div className="section-index">01 / Profile</div>
         <Reveal>
           <p className="about-lead">
-            Twoquarters Production Co. Ltd. 成立于 1998 年，是一家集摄影、品牌与营销于一体的综合型创意制作机构。
+            Twoquarters Production Co. Ltd. 成立于 2011 年，是一家集摄影、品牌与营销于一体的综合型创意制作机构。
           </p>
         </Reveal>
         <div className="about-columns">
           <p>
-            我们的总部始于香港，并在德国与中国建立协作网络。二十余年来，我们持续连接国际摄影师、数字艺术家和本地制作团队，为欧洲与亚洲的品牌提供完整视觉服务。
+            我们的总部始于香港，并在德国与中国建立协作网络。十余年来，我们持续连接国际摄影师、数字艺术家和本地制作团队，为欧洲与亚洲的品牌提供完整视觉服务。
           </p>
           <p>
             摄影是我们的核心，也是所有创意判断的起点。我们结合实拍经验、CGI 技术与严谨后期，让作品不止于记录产品，而是建立一种能够被感知、记忆和延展的品牌语言。
@@ -61,9 +61,9 @@ export function AboutPage() {
       </section>
 
       <section className="about-numbers">
-        <div><strong>1998</strong><span>成立于香港</span></div>
+        <div><strong>2011</strong><span>成立于香港</span></div>
         <div><strong>3</strong><span>跨区域协作网络</span></div>
-        <div><strong>20+</strong><span>年国际制作经验</span></div>
+        <div><strong>10+</strong><span>年国际制作经验</span></div>
       </section>
 
       <section className="contact-panel">
