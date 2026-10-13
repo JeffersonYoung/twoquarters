@@ -80,6 +80,34 @@ const imgTags = markup => [...markup.matchAll(/<img\b[^>]*>/g)].map(match => mat
 const attr = (tag, name) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, 'i'))?.[1];
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
 
+test('About service links open the requested automotive and behind-the-scenes categories', () => {
+  const { AboutPage } = loadSource('pages/AboutPage.tsx');
+  const anchors = [...render(AboutPage).matchAll(/<a\b[^>]*>/g)].map(match => match[0]);
+  for (const [title, category] of [['商业摄影', 'automotive'], ['品牌影像', 'bts']]) {
+    const link = anchors.find(tag => attr(tag, 'aria-label') === `${title}：查看作品`);
+    assert.ok(link, title);
+    assert.equal(attr(link, 'href'), `/works?category=${category}`);
+  }
+});
+
+test('Works selects the URL category and shows only matching projects', () => {
+  for (const [category, label] of [['automotive', '汽车'], ['bts', '幕后影像']]) {
+    const { WorksPage } = loadSource('pages/WorksPage.tsx', { search: `?category=${category}`, fixture: { ...project, category } });
+    const markup = render(WorksPage);
+    assert.match(markup, new RegExp(`<button[^>]*aria-selected="true"[^>]*>${label}`));
+    assert.ok(markup.includes('href="/works/fixture"'));
+  }
+  const { WorksPage } = loadSource('pages/WorksPage.tsx', { search: '?category=bts' });
+  assert.ok(!render(WorksPage).includes('href="/works/fixture"'));
+});
+
+test('Works falls back to all projects for an unknown category', () => {
+  const { WorksPage } = loadSource('pages/WorksPage.tsx', { search: '?category=unknown' });
+  const markup = render(WorksPage);
+  assert.match(markup, /<button[^>]*aria-selected="true"[^>]*>全部/);
+  assert.ok(markup.includes('href="/works/fixture"'));
+});
+
 test('local uploaded images receive bounded responsive URLs with a resized fallback', () => {
   assert.equal(helper.imageVariant(upload, 480), `${upload}?width=480`);
   assert.deepEqual(helper.responsiveImage(upload, [480, 960], '50vw'), {

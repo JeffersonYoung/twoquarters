@@ -4,10 +4,10 @@ import { responsiveImage } from "../lib/images";
 import { Link } from "../router";
 
 const services = [
-  ["01", "商业摄影", "汽车 / 人物 / 静物 / 美妆"],
-  ["02", "CGI 与后期", "三维视觉 / 精修 / 动态图像"],
-  ["03", "创意制作", "概念开发 / 制片 / 全球协作"],
-  ["04", "品牌影像", "视觉系统 / 内容规划 / 资产管理"],
+  ["01", "商业摄影", "汽车 / 人物 / 静物 / 美妆", "/works?category=automotive"],
+  ["02", "CGI 与后期", "三维视觉 / 精修 / 动态图像", "/works"],
+  ["03", "创意制作", "概念开发 / 制片 / 全球协作", "/works"],
+  ["04", "品牌影像", "视觉系统 / 内容规划 / 资产管理", "/works?category=bts"],
 ];
 
 export function AboutPage() {
@@ -47,9 +47,9 @@ export function AboutPage() {
           <h2>我们所做的事</h2>
         </div>
         <div className="service-table">
-          {services.map(([number, title, description]) => (
+          {services.map(([number, title, description, href]) => (
             <Reveal key={number}>
-              <Link to="/works" className="service-link" aria-label={`${title}：查看作品`}>
+              <Link to={href} className="service-link" aria-label={`${title}：查看作品`}>
                 <span>{number}</span>
                 <h3>{title}</h3>
                 <p>{description}</p>

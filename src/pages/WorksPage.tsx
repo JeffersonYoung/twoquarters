@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
 import { categoryLabels, selectableCategories, type ProjectCategory } from "../data";
 import { useProjects } from "../ProjectsContext";
+import { useLocation } from "../router";
 
 type Filter = "all" | ProjectCategory;
 
@@ -13,8 +13,18 @@ const filters: { value: Filter; label: string }[] = [
 
 export function WorksPage() {
   const { projects } = useProjects();
-  const [filter, setFilter] = useState<Filter>("all");
+  const { search, hash = "", navigate } = useLocation();
+  const category = new URLSearchParams(search).get("category");
+  const filter: Filter = filters.find((item) => item.value === category)?.value ?? "all";
   const visibleProjects = filter === "all" ? projects : projects.filter((project) => project.category === filter);
+
+  function setFilter(value: Filter) {
+    const params = new URLSearchParams(search);
+    if (value === "all") params.delete("category");
+    else params.set("category", value);
+    const query = params.toString();
+    navigate(`/works${query ? `?${query}` : ""}${hash}`);
+  }
 
   return (
     <main className="page-main">
