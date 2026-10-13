@@ -579,6 +579,19 @@ main {
   line-height: 1.65;
 }
 
+.works-intro {
+  min-height: 0;
+  padding-bottom: 28px;
+}
+
+.works-intro > span {
+  margin-bottom: 72px;
+}
+
+.works-intro > p {
+  margin-top: 24px;
+}
+
 .works-browser {
   padding: 0 28px 150px;
 }
@@ -1449,6 +1462,19 @@ main {
     max-width: 290px;
     margin-top: 35px;
     font-size: 0.78rem;
+  }
+
+  .works-intro {
+    min-height: 0;
+    padding-bottom: 28px;
+  }
+
+  .works-intro > span {
+    margin-bottom: 64px;
+  }
+
+  .works-intro > p {
+    margin-top: 24px;
   }
 
   .works-browser {

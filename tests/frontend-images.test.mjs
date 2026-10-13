@@ -98,7 +98,7 @@ test('known decorative assets receive static WebP variants', () => {
   for (const source of [
     '/images/automotive/hero-mclaren.jpg',
     '/images/bts/francesco-ungaro-P45gR9kH0SM-unsplash.jpg',
-    '/images/about/lake-mountains.jpg',
+    '/images/about/grassland-stream.jpg',
   ]) {
     const result = helper.responsiveImage(source, [480, 960, 1600], '100vw');
     assert.equal(result.src, source.replace('.jpg', '-480.webp'));
@@ -210,7 +210,7 @@ test('Home prioritizes the responsive static hero and defers all featured cards;
   for (const card of cards) assert.equal(attr(card, 'loading'), 'lazy');
   const { AboutPage } = loadSource('pages/AboutPage.tsx');
   const [about] = imgTags(render(AboutPage));
-  assert.equal(attr(about, 'src'), '/images/about/lake-mountains-480.webp');
+  assert.equal(attr(about, 'src'), '/images/about/grassland-stream-480.webp');
   assert.equal(attr(about, 'loading'), 'lazy');
   assert.equal(attr(about, 'sizes'), '100vw');
   assert.ok(attr(about, 'srcSet').includes('-1600.webp 1600w'));

@@ -36,7 +36,7 @@ export function AboutPage() {
       </section>
 
       <section className="about-image-band">
-        <img {...responsiveImage("/images/about/lake-mountains.jpg", [480, 960, 1600], "100vw")} alt="雪山与湖泊的环境勘景影像" loading="lazy" decoding="async" />
+        <img {...responsiveImage("/images/about/grassland-stream.jpg", [480, 960, 1600], "100vw")} alt="草原与溪流的环境勘景影像" loading="lazy" decoding="async" />
         <span>Observe / Build / Refine</span>
       </section>
 

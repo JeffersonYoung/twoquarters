@@ -6,7 +6,7 @@ const localImagePath = /^\/api\/images\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 const staticImagePaths = new Set([
   "/images/automotive/hero-mclaren.jpg",
   "/images/bts/francesco-ungaro-P45gR9kH0SM-unsplash.jpg",
-  "/images/about/lake-mountains.jpg",
+  "/images/about/grassland-stream.jpg",
 ]);
 
 export function imageVariant(src: string, width: ImageWidth): string {
