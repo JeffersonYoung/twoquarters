@@ -80,6 +80,26 @@ const imgTags = markup => [...markup.matchAll(/<img\b[^>]*>/g)].map(match => mat
 const attr = (tag, name) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, 'i'))?.[1];
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
 
+test('project metadata renders the five centered credit rows in the reference order', () => {
+  const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx');
+  const markup = render(ProjectMetadata, { project: { ...project, brand: 'HUAWEI & STELATO S9', agency: 'Ogilvy', productionCompany: 'Override', photographer: 'Kai-Uwe Gundlach', retouchTeam: 'Twoquarters & YIXIU' } });
+  assert.deepEqual([...markup.matchAll(/<dt>(.*?)<\/dt>/g)].map(match => match[1]), ['Brand:', 'Agency:', 'Production Company:', 'Photographer:', 'Retouch Team:']);
+  assert.ok(markup.includes('HUAWEI &amp; STELATO S9'));
+  assert.ok(markup.includes('<dd>Twoquarters</dd>'));
+  assert.ok(!markup.includes('Override'));
+});
+
+test('legacy projects always show Twoquarters and omit blank optional metadata', () => {
+  const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx');
+  const markup = render(ProjectMetadata, { project: { ...project, agency: '   ' } });
+  assert.equal([...markup.matchAll(/<dt>/g)].length, 1);
+  assert.ok(markup.includes('<dt>Production Company:</dt><dd>Twoquarters</dd>'));
+  for (const category of ['automotive', 'video']) {
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...project, category } });
+    assert.ok(render(ProjectPage).includes('class="project-metadata"'));
+  }
+});
+
 test('About service links open the requested automotive and behind-the-scenes categories', () => {
   const { AboutPage } = loadSource('pages/AboutPage.tsx');
   const anchors = [...render(AboutPage).matchAll(/<a\b[^>]*>/g)].map(match => match[0]);

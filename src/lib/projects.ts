@@ -5,7 +5,7 @@ export type AdminProject = Omit<Project, "cover"> & {
   cover: ProjectImage | null;
   published: boolean;
 };
-export type ProjectDraft = Pick<AdminProject, "title" | "titleEn" | "category" | "year" | "discipline" | "summary" | "credits" | "published">;
+export type ProjectDraft = Pick<AdminProject, "title" | "titleEn" | "category" | "year" | "discipline" | "summary" | "credits" | "brand" | "agency" | "photographer" | "retouchTeam" | "published">;
 export type AdminSession = { admin: boolean; csrfToken: string | null };
 
 // Keep the anti-CSRF token in memory. The session itself stays in an HttpOnly cookie.

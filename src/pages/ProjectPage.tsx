@@ -2,9 +2,9 @@ import { ArrowLeft, ArrowRight, Maximize2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Lightbox } from "../components/Lightbox";
 import { ProjectWatch } from "../components/ProjectWatch";
+import { ProjectMetadata } from "../components/ProjectMetadata";
 import { playableVideos } from "../lib/videos";
 import { Reveal } from "../components/Reveal";
-import { categoryLabels } from "../data";
 import { highPriorityImage, projectGallerySizes, responsiveImage } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
 import { Link, Navigate, useParams } from "../router";
@@ -39,16 +39,13 @@ export function ProjectPage() {
         </div>
       </section>}
 
-      <section className="project-information">
-        <div className="project-facts">
-          <div><span>年份</span><strong>{project.year}</strong></div>
-          <div><span>类别</span><strong>{categoryLabels[project.category]}</strong></div>
-          <div><span>服务</span><strong>{project.discipline}</strong></div>
-        </div>
+      <ProjectMetadata project={project} />
+
+      {project.summary && <section className="project-information">
         {isVideoProject ? <p className="project-summary">{project.summary}</p> : <Reveal>
           <p className="project-summary">{project.summary}</p>
         </Reveal>}
-      </section>
+      </section>}
 
       {isVideoProject && project.credits && <section className="project-credit"><span>Credits</span><p>{project.credits}</p></section>}
 
@@ -64,7 +61,7 @@ export function ProjectPage() {
         ))}
       </section>}
 
-      {!isVideoProject && <section className="project-credit">
+      {!isVideoProject && project.credits && <section className="project-credit">
         <span>Credits</span>
         <p>{project.credits}</p>
       </section>}

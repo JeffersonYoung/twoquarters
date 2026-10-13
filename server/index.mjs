@@ -28,12 +28,13 @@ async function body(req,max=64*1024){
 async function input(req){if(!req.headers['content-type']?.startsWith('application/json'))fail('需要 JSON',415);try{return JSON.parse(await body(req));}catch(e){if(e.status)throw e;fail('JSON 格式不正确');}}
 function getProject(id){const r=db.prepare('SELECT * FROM projects WHERE id=?').get(id);if(!r)fail('作品不存在',404);return JSON.parse(r.data);}
 function save(p){db.prepare('UPDATE projects SET data=?,published=? WHERE id=?').run(JSON.stringify(p),p.published?1:0,p.id);return p;}
-function draft(value){
+function draft(value,previous={}){
  if(!value||typeof value!=='object'||Array.isArray(value))fail('资料格式不正确');
- const d={};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000})){
+ value={brand:previous.brand||'',agency:previous.agency||'',photographer:previous.photographer||'',retouchTeam:previous.retouchTeam||'',...value};
+ const d={};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000,brand:200,agency:200,photographer:200,retouchTeam:200})){
   if(value[key]!=null&&typeof value[key]!=='string')fail('文字资料格式不正确');d[key]=(value[key]||'').trim();if(d[key].length>max)fail('文字过长');
  }
- if(!d.title||!['automotive','cg-ai','fmcg','video','bts'].includes(d.category))fail('请填写标题和有效分类');d.published=value.published===true;return d;
+ if(!d.title||!['automotive','cg-ai','fmcg','video','bts'].includes(d.category))fail('请填写标题和有效分类');d.productionCompany='Twoquarters';d.published=value.published===true;return d;
 }
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.woff2':'font/woff2','.ico':'image/x-icon'};
 async function sendFile(req,res,file,type){let bytes;try{bytes=await readFile(file);}catch{fail('Not found',404);}res.writeHead(200,{'Content-Type':type||mime[path.extname(file)]||'application/octet-stream','Content-Length':bytes.length});res.end(req.method==='HEAD'?undefined:bytes);}
@@ -117,7 +118,7 @@ async function handle(req,res){
   const match=route.match(/^\/api\/admin\/projects\/([^/]+)(?:\/(cover|images)(?:\/([^/]+))?)?$/);
   if(match){
    const [,id,action,imageId]=match;
-   if(!action&&method==='PATCH'){const p=getProject(id),d=draft(await input(req));if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
+   if(!action&&method==='PATCH'){const p=getProject(id),d=draft(await input(req),p);if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
    if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
    if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,p);}

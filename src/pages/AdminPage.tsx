@@ -51,6 +51,10 @@ const emptyDraft: ProjectDraft = {
   discipline: "Photography",
   summary: "",
   credits: "",
+  brand: "",
+  agency: "",
+  photographer: "",
+  retouchTeam: "",
   published: false,
 };
 
@@ -70,6 +74,10 @@ function projectDraft(project: AdminProject): ProjectDraft {
     discipline: project.discipline,
     summary: project.summary,
     credits: project.credits || "",
+    brand: project.brand || "",
+    agency: project.agency || "",
+    photographer: project.photographer || "",
+    retouchTeam: project.retouchTeam || "",
     published: project.published,
   };
 }
@@ -550,6 +558,11 @@ export function AdminPage() {
               <label className="wide">服务内容<input value={draft.discipline} required onChange={(event) => updateDraft("discipline", event.target.value)} /></label>
               <label className="wide">项目简介<textarea rows={4} value={draft.summary} onChange={(event) => updateDraft("summary", event.target.value)} /></label>
               <label className="wide">项目署名<input value={draft.credits} onChange={(event) => updateDraft("credits", event.target.value)} /></label>
+              <label>Brand（品牌，选填）<input value={draft.brand || ""} maxLength={200} onChange={(event) => updateDraft("brand", event.target.value)} /></label>
+              <label>Agency（代理商，选填）<input value={draft.agency || ""} maxLength={200} onChange={(event) => updateDraft("agency", event.target.value)} /></label>
+              <label className="wide">Production Company（制作公司）<input value="Twoquarters" readOnly /></label>
+              <label>Photographer（摄影师，选填）<input value={draft.photographer || ""} maxLength={200} onChange={(event) => updateDraft("photographer", event.target.value)} /></label>
+              <label>Retouch Team（后期团队，选填）<input value={draft.retouchTeam || ""} maxLength={200} onChange={(event) => updateDraft("retouchTeam", event.target.value)} /></label>
               <label className="publish-toggle">
                 <input
                   type="checkbox"

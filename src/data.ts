@@ -38,6 +38,11 @@ export type Project = {
   images: ProjectImage[];
   videos?: ProjectVideo[];
   credits?: string;
+  brand?: string;
+  agency?: string;
+  productionCompany?: "Twoquarters";
+  photographer?: string;
+  retouchTeam?: string;
   published?: boolean;
 };
 
