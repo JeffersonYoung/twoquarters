@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Reveal } from "../components/Reveal";
 import { responsiveImage } from "../lib/images";
+import { Link } from "../router";
 
 const services = [
   ["01", "商业摄影", "汽车 / 人物 / 静物 / 美妆"],
@@ -48,12 +49,12 @@ export function AboutPage() {
         <div className="service-table">
           {services.map(([number, title, description]) => (
             <Reveal key={number}>
-              <article>
+              <Link to="/works" className="service-link" aria-label={`${title}：查看作品`}>
                 <span>{number}</span>
                 <h3>{title}</h3>
                 <p>{description}</p>
                 <ArrowUpRight aria-hidden="true" />
-              </article>
+              </Link>
             </Reveal>
           ))}
         </div>
