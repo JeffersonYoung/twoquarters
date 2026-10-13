@@ -100,7 +100,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
       <section className="studio-note">
         <div className="section-index">03 / 04</div>
         <Reveal className="studio-copy">
-          <span>{english ? "Since 1998" : "始于 1998"}</span>
+          <span>{english ? "Since 2011" : "始于 2011"}</span>
           <h2>{english ? "A global perspective, made precise." : "国际视野，落地为精确执行。"}</h2>
           <p>
             {english
