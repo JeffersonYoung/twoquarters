@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
+import { isEnglishLocation, localizedHref } from "./lib/language";
 import {
   createContext,
   useCallback,
@@ -67,7 +68,9 @@ export function useLocation() {
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { to: string };
 
 export function Link({ to, onClick, children, ...props }: LinkProps) {
-  const { navigate } = useLocation();
+  const location = useLocation();
+  const { navigate } = location;
+  const href = localizedHref(to, isEnglishLocation(location));
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     onClick?.(event);
@@ -81,10 +84,10 @@ export function Link({ to, onClick, children, ...props }: LinkProps) {
       props.target === "_blank"
     ) return;
     event.preventDefault();
-    navigate(to);
+    navigate(href);
   }
 
-  return <a {...props} href={to} onClick={handleClick}>{children}</a>;
+  return <a {...props} href={href} onClick={handleClick}>{children}</a>;
 }
 
 export function NavLink({ to, end = false, className = "", ...props }: LinkProps & { end?: boolean }) {

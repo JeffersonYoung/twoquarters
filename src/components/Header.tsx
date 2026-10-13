@@ -1,6 +1,7 @@
 import { ArrowUpRight, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "../router";
+import { isEnglishLocation, languageSwitchHref } from "../lib/language";
 
 const zhNav = [
   { to: "/", label: "首页" },
@@ -10,7 +11,7 @@ const zhNav = [
 
 export function Header() {
   const location = useLocation();
-  const isEnglish = location.pathname === "/en";
+  const isEnglish = isEnglishLocation(location);
   const [openPath, setOpenPath] = useState<string | null>(null);
   const open = openPath === location.pathname;
 
@@ -27,9 +28,9 @@ export function Header() {
       <nav className="desktop-nav" aria-label={isEnglish ? "Primary navigation" : "主导航"}>
         {isEnglish ? (
           <>
-            <a href="#work">Work</a>
-            <a href="#capabilities">Capabilities</a>
-            <a href="#contact">Contact</a>
+            <Link to="/works">Work</Link>
+            <Link to="/en#capabilities">Capabilities</Link>
+            <Link to="/en#contact">Contact</Link>
           </>
         ) : (
           zhNav.map((item) => (
@@ -40,7 +41,7 @@ export function Header() {
         )}
       </nav>
 
-      <Link className="locale-link" to={isEnglish ? "/" : "/en"}>
+      <Link className="locale-link" to={languageSwitchHref(location)}>
         {isEnglish ? "中文" : "EN"}
         <ArrowUpRight size={15} aria-hidden="true" />
       </Link>
@@ -59,9 +60,9 @@ export function Header() {
         <nav aria-label={isEnglish ? "Mobile navigation" : "移动端导航"}>
           {isEnglish ? (
             <>
-              <a href="#work" onClick={() => setOpenPath(null)}>Work</a>
-              <a href="#capabilities" onClick={() => setOpenPath(null)}>Capabilities</a>
-              <a href="#contact" onClick={() => setOpenPath(null)}>Contact</a>
+              <Link to="/works" onClick={() => setOpenPath(null)}>Work</Link>
+              <Link to="/en#capabilities" onClick={() => setOpenPath(null)}>Capabilities</Link>
+              <Link to="/en#contact" onClick={() => setOpenPath(null)}>Contact</Link>
             </>
           ) : (
             zhNav.map((item, index) => (
@@ -71,8 +72,8 @@ export function Header() {
             ))
           )}
         </nav>
-        <Link className="mobile-locale" to={isEnglish ? "/" : "/en"} onClick={() => setOpenPath(null)}>
-          {isEnglish ? "切换至中文" : "English homepage"}
+        <Link className="mobile-locale" to={languageSwitchHref(location)} onClick={() => setOpenPath(null)}>
+          {isEnglish ? "切换至中文" : "English"}
           <ArrowUpRight aria-hidden="true" />
         </Link>
       </div>

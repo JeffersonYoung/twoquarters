@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getSiteConfig, type PublicSiteConfig } from "../lib/site-config";
 import { ArrowUpRight } from "lucide-react";
 import { Link, useLocation } from "../router";
+import { isEnglishLocation, languageSwitchHref } from "../lib/language";
 
 export function Footer() {
   const [{ filingItems, socialLinks }, setSiteConfig] = useState<PublicSiteConfig>({ filingItems: [], socialLinks: [] });
@@ -14,7 +15,8 @@ export function Footer() {
     }).finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
   }, []);
-  const isEnglish = useLocation().pathname === "/en";
+  const location = useLocation();
+  const isEnglish = isEnglishLocation(location);
 
   return (
     <footer className="site-footer" id="contact">
@@ -28,7 +30,7 @@ export function Footer() {
         <span>Beijing · Hong Kong · Germany</span>
         <span>+86 10 6500 6833</span>
         <span>© 2026 Twoquarters</span>
-        <Link to={isEnglish ? "/" : "/en"}>{isEnglish ? "中文" : "English"}</Link>
+        <Link to={languageSwitchHref(location)}>{isEnglish ? "中文" : "English"}</Link>
       </div>
       <FilingLinks items={filingItems} isEnglish={isEnglish} />
     </footer>

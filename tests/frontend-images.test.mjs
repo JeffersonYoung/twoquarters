@@ -93,7 +93,7 @@ test('Home capabilities link to matching categories in both languages', () => {
 });
 
 test('project metadata renders the five centered credit rows in the reference order', () => {
-  const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx');
+  const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx', { search: '?lang=en' });
   const markup = render(ProjectMetadata, { project: { ...project, brand: 'HUAWEI & STELATO S9', agency: 'Ogilvy', productionCompany: 'Override', photographer: 'Kai-Uwe Gundlach', retouchTeam: 'Twoquarters & YIXIU' } });
   assert.deepEqual([...markup.matchAll(/<dt>(.*?)<\/dt>/g)].map(match => match[1]), ['Brand:', 'Agency:', 'Production Company:', 'Photographer:', 'Retouch Team:']);
   assert.ok(markup.includes('HUAWEI &amp; STELATO S9'));
@@ -105,11 +105,36 @@ test('legacy projects always show Twoquarters and omit blank optional metadata',
   const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx');
   const markup = render(ProjectMetadata, { project: { ...project, agency: '   ' } });
   assert.equal([...markup.matchAll(/<dt>/g)].length, 1);
-  assert.ok(markup.includes('<dt>Production Company:</dt><dd>Twoquarters</dd>'));
+  assert.ok(markup.includes('<dt>制作公司：</dt><dd>Twoquarters</dd>'));
   for (const category of ['automotive', 'video']) {
     const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...project, category } });
     assert.ok(render(ProjectPage).includes('class="project-metadata"'));
   }
+});
+
+test('metadata keys follow the page language while all five values stay identical', () => {
+  const fixture = { ...project, brand: 'HUAWEI & STELATO S9', agency: 'Ogilvy', photographer: 'Kai-Uwe Gundlach', retouchTeam: 'Twoquarters & YIXIU' };
+  const { ProjectMetadata: Chinese } = loadSource('components/ProjectMetadata.tsx');
+  const { ProjectMetadata: English } = loadSource('components/ProjectMetadata.tsx', { search: '?lang=en' });
+  const zh = render(Chinese, { project: fixture });
+  const en = render(English, { project: fixture });
+  assert.deepEqual([...zh.matchAll(/<dt>(.*?)<\/dt>/g)].map(match => match[1]), ['品牌：', '代理商：', '制作公司：', '摄影师：', '后期团队：']);
+  assert.deepEqual([...zh.matchAll(/<dd>(.*?)<\/dd>/g)].map(match => match[1]), [...en.matchAll(/<dd>(.*?)<\/dd>/g)].map(match => match[1]));
+});
+
+test('English navigation keeps its language on project links and language switching keeps the current project', () => {
+  const { isEnglishLocation, localizedHref, languageSwitchHref } = loadSource('lib/language.ts');
+  assert.equal(isEnglishLocation({ pathname: '/en' }), true);
+  assert.equal(isEnglishLocation({ pathname: '/works/fixture', search: '?lang=en' }), true);
+  assert.equal(isEnglishLocation({ pathname: '/works/fixture', search: '?lang=zh' }), false);
+  assert.equal(localizedHref('/works/fixture?video=123#details', true), '/works/fixture?video=123&lang=en#details');
+  assert.equal(localizedHref('/works?category=automotive', true), '/works?category=automotive&lang=en');
+  assert.equal(localizedHref('/works/fixture?lang=zh', true), '/works/fixture?lang=zh');
+  assert.equal(localizedHref('/admin', true), '/admin');
+  assert.equal(localizedHref('https://example.com/', true), 'https://example.com/');
+  assert.equal(languageSwitchHref({ pathname: '/works/fixture', search: '?video=123&lang=en', hash: '#details' }), '/works/fixture?video=123&lang=zh#details');
+  assert.equal(languageSwitchHref({ pathname: '/works/fixture', search: '?category=bts' }), '/works/fixture?category=bts&lang=en');
+  assert.equal(languageSwitchHref({ pathname: '/en' }), '/?lang=zh');
 });
 
 test('About service links open the requested automotive and behind-the-scenes categories', () => {
