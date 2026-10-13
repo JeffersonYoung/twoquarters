@@ -437,16 +437,27 @@ main {
   margin-left: 10%;
 }
 
-.capability-list article {
+.capability-list .capability-link {
   display: grid;
   grid-template-columns: 1fr 3fr 4fr auto;
   align-items: center;
   gap: 24px;
   min-height: 150px;
   border-bottom: 1px solid rgb(255 255 255 / 0.24);
+  transition: background-color 180ms ease;
 }
 
-.capability-list article > span {
+.capability-link:hover,
+.capability-link:focus-visible {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+.capability-link:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+}
+
+.capability-list .capability-link > span {
   color: var(--cyan);
   font-size: 0.72rem;
 }
@@ -1425,7 +1436,7 @@ main {
     margin-left: 0;
   }
 
-  .capability-list article,
+  .capability-list .capability-link,
   .service-table .service-link {
     grid-template-columns: 28px 1fr auto;
     gap: 10px;

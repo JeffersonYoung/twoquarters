@@ -6,9 +6,9 @@ import { useProjects } from "../ProjectsContext";
 import { Link } from "../router";
 
 const capabilities = [
-  ["01", "Photography", "商业摄影", "从人物、汽车到静物，用完整的前期与现场制作建立统一视觉。"],
-  ["02", "CGI", "数字影像", "将实拍质感、三维资产和后期工艺组合成可持续扩展的品牌图像。"],
-  ["03", "Production", "整合制作", "连接欧洲与亚洲的创意及制作资源，把复杂项目转化为清晰流程。"],
+  ["01", "Photography", "商业摄影", "从人物、汽车到静物，用完整的前期与现场制作建立统一视觉。", "/works?category=automotive"],
+  ["02", "CGI", "数字影像", "将实拍质感、三维资产和后期工艺组合成可持续扩展的品牌图像。", "/works?category=cg-ai"],
+  ["03", "Production", "整合制作", "连接欧洲与亚洲的创意及制作资源，把复杂项目转化为清晰流程。", "/works?category=bts"],
 ];
 
 export function HomePage({ english = false }: { english?: boolean }) {
@@ -76,9 +76,9 @@ export function HomePage({ english = false }: { english?: boolean }) {
           <h2>{english ? "Capabilities" : "核心能力"}</h2>
         </div>
         <div className="capability-list">
-          {capabilities.map(([number, en, zh, description]) => (
+          {capabilities.map(([number, en, zh, description, href]) => (
             <Reveal key={number}>
-              <article>
+              <Link to={href} className="capability-link" aria-label={english ? `${en}: View work` : `${zh}：查看作品`}>
                 <span>{number}</span>
                 <h3>{english ? en : zh}</h3>
                 <p>
@@ -91,7 +91,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
                     : description}
                 </p>
                 <ArrowRight aria-hidden="true" />
-              </article>
+              </Link>
             </Reveal>
           ))}
         </div>

@@ -80,6 +80,18 @@ const imgTags = markup => [...markup.matchAll(/<img\b[^>]*>/g)].map(match => mat
 const attr = (tag, name) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, 'i'))?.[1];
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
 
+test('Home capabilities link to matching categories in both languages', () => {
+  const { HomePage } = loadSource('pages/HomePage.tsx');
+  for (const english of [false, true]) {
+    const links = [...render(HomePage, { english }).matchAll(/<a\b[^>]*class="capability-link"[^>]*>/g)].map(match => match[0]);
+    assert.equal(links.length, 3);
+    for (const [index, category] of ['automotive', 'cg-ai', 'bts'].entries()) {
+      assert.equal(attr(links[index], 'href'), `/works?category=${category}`);
+      assert.ok(attr(links[index], 'aria-label'));
+    }
+  }
+});
+
 test('project metadata renders the five centered credit rows in the reference order', () => {
   const { ProjectMetadata } = loadSource('components/ProjectMetadata.tsx');
   const markup = render(ProjectMetadata, { project: { ...project, brand: 'HUAWEI & STELATO S9', agency: 'Ogilvy', productionCompany: 'Override', photographer: 'Kai-Uwe Gundlach', retouchTeam: 'Twoquarters & YIXIU' } });
