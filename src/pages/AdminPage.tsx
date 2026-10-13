@@ -540,7 +540,7 @@ export function AdminPage() {
             <div className="editor-section-heading"><span>01</span><h2>项目资料</h2></div>
             <fieldset className="editor-fields" disabled={locked}>
               <label>中文标题<input value={draft.title} required onChange={(event) => updateDraft("title", event.target.value)} /></label>
-              <label>英文标题<input value={draft.titleEn} required onChange={(event) => updateDraft("titleEn", event.target.value)} /></label>
+              <label>英文标题（选填）<input value={draft.titleEn} onChange={(event) => updateDraft("titleEn", event.target.value)} /></label>
               <label>分类
                 <select value={draft.category} onChange={(event) => updateDraft("category", event.target.value as ProjectCategory)}>
                   {selectableCategories.map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}
