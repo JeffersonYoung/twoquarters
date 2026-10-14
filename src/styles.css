@@ -2269,14 +2269,16 @@ main {
 /* Video production credits share one readable role/value list. */
 .project-watch-page .project-metadata {
   padding: 40px 28px 64px;
-  font-family: inherit;
-  font-size: clamp(1rem, 1.2vw, 1.125rem);
-  line-height: 1.75;
-  color: var(--ink);
+  font-family: "Times New Roman", "Noto Serif SC", serif;
+  font-size: clamp(1.125rem, 1.6vw, 1.75rem);
+  font-weight: 400;
+  line-height: 1.45;
+  color: #808080;
   text-align: left;
 }
 .project-watch-page .project-metadata dl {
-  max-width: 960px;
+  width: fit-content;
+  max-width: min(960px, 100%);
   display: grid;
   gap: 8px;
 }
@@ -2287,9 +2289,9 @@ main {
   justify-content: normal;
   gap: 0 24px;
 }
-.project-watch-page .project-metadata dt { color: #666; }
+.project-watch-page .project-metadata dt { color: inherit; text-align: right; }
 .project-watch-page .project-metadata dd { min-width: 0; }
 @media (max-width: 640px) {
-  .project-watch-page .project-metadata { padding: 28px 16px 40px; font-size: 1rem; }
+  .project-watch-page .project-metadata { padding: 28px 16px 40px; font-size: 1.125rem; }
   .project-watch-page .project-metadata dl > div { grid-template-columns: 8em minmax(0, 1fr); gap: 0 12px; }
 }
