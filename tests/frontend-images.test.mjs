@@ -430,3 +430,20 @@ test('portrait, landscape, square and panoramic work cards retain intrinsic dime
     }
   }
 });
+
+test('video production credits form one list with one row per role and no repeated metadata', () => {
+  const fixture = {
+    ...project, category: 'video', brand: '智界', agency: '北京电通', photographer: '李满垛',
+    retouchTeam: '调色：万象镜、俞勇美\n剪辑：Aten/高高',
+    credits: '客户：侯赛\n代理商：北京电通\n制作公司：Twoquarters\n摄影指导：李满垛\n调色：万象镜、俞勇美\n剪辑：Aten/高高\n导演：滕骄阳',
+  };
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture });
+  const markup = render(ProjectPage);
+  const pairs = [...markup.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(match => [match[1], match[2]]);
+  assert.deepEqual(pairs, [
+    ['品牌：', '智界'], ['代理商：', '北京电通'], ['制作公司：', 'Twoquarters'],
+    ['客户：', '侯赛'], ['摄影指导：', '李满垛'], ['调色：', '万象镜、俞勇美'],
+    ['剪辑：', 'Aten/高高'], ['导演：', '滕骄阳'],
+  ]);
+  assert.ok(!markup.includes('class="project-credit"'), 'video credits appear only in the unified list');
+});

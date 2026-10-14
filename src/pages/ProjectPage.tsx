@@ -39,7 +39,7 @@ export function ProjectPage() {
         </div>
       </section>}
 
-      <ProjectMetadata project={project} />
+      <ProjectMetadata project={project} includeCredits={isVideoProject} />
 
       {project.summary && <section className="project-information">
         {isVideoProject ? <p className="project-summary">{project.summary}</p> : <Reveal>
@@ -47,7 +47,7 @@ export function ProjectPage() {
         </Reveal>}
       </section>}
 
-      {isVideoProject && project.credits && <section className="project-credit"><span>Credits</span><p>{project.credits}</p></section>}
+      
 
       {!isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
