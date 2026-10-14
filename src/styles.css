@@ -235,10 +235,17 @@ main {
 }
 
 .intro-band {
+  background: var(--ink);
+  color: var(--white);
   display: grid;
   grid-template-columns: 1fr 7fr 2fr;
   gap: 24px;
   padding: 120px 28px 138px;
+}
+
+.intro-band .section-index,
+.intro-band .intro-aside {
+  color: var(--white);
 }
 
 .section-index {
