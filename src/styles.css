@@ -1222,6 +1222,13 @@ main {
 @media (max-width: 960px) {
   .site-header {
     grid-template-columns: 1fr auto auto;
+    /* A backdrop filter makes this header the containing block for its fixed menu. */
+    backdrop-filter: none;
+    background: var(--ink);
+  }
+
+  html:has(.site-header.menu-open) {
+    overflow: hidden;
   }
 
   .desktop-nav {
@@ -1247,6 +1254,8 @@ main {
   .mobile-menu {
     position: fixed;
     inset: 68px 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: -1;
     display: flex;
     visibility: hidden;
