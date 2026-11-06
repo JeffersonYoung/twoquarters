@@ -4,11 +4,13 @@ import type { ProjectImage } from "../data";
 
 export function Lightbox({
   images,
+  useImageCdn = false,
   index,
   onChange,
   onClose,
 }: {
   images: ProjectImage[];
+  useImageCdn?: boolean;
   index: number;
   onChange: (index: number) => void;
   onClose: () => void;
@@ -31,6 +33,10 @@ export function Lightbox({
   }, [images.length, index, onChange, onClose]);
 
   const image = images[index];
+  const original = image.src;
+  const src = useImageCdn && /^\/api\/images\/[a-f0-9-]{36}$/.test(original)
+    ? `https://img.twoquarters.com.cn${original}`
+    : original;
 
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label="作品大图">
@@ -50,7 +56,9 @@ export function Lightbox({
         <ChevronLeft aria-hidden="true" />
       </button>
       <figure className="lightbox-figure">
-        <img src={image.src} alt={`作品图片 ${index + 1}`} />
+        <img key={src} src={src} alt={`作品图片 ${index + 1}`} onError={({ currentTarget }) => {
+          if (src !== original && currentTarget.getAttribute("src") === src) currentTarget.src = original;
+        }} />
       </figure>
       <button
         className="lightbox-arrow lightbox-next"

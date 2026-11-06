@@ -62,14 +62,16 @@ async function sendFile(req,res,file,type){let bytes;try{bytes=await readFile(fi
 let pendingLogins=0;
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
- res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.twoquarters.com.cn blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
  // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
+ const imageCdn=req.headers['x-twoquarters-image-cdn']==='1';
+ if(imageCdn && (!['GET','HEAD'].includes(method) || !/^\/api\/images\/[a-f0-9-]{36}$/.test(route) || url.search))fail('Not found',404);
  const adminTransport=!secure||trustedHTTPS(req);
  let decodedRoute;try{decodedRoute=decodeURIComponent(route);}catch{fail('Bad path');}
  if(!adminTransport&&(decodedRoute.startsWith('/admin')||route.startsWith('/api/admin/')||route==='/api/login'||route==='/api/logout'||!['GET','HEAD'].includes(method)))fail('管理操作必须通过配置的 HTTPS 地址访问',403);
  // An HTTP visitor never gains draft/session privileges, even with a replayed cookie.
- const current=adminTransport?session(req):null;
+ const current=adminTransport&&!imageCdn?session(req):null;
  if(route.startsWith('/api/')){
   if(!['GET','HEAD'].includes(method)){
    if(req.headers.origin!==origin)fail('请从本站提交操作',403);
@@ -116,7 +118,11 @@ async function handle(req,res){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
    const lookup=()=>{
     const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();
-    for(const r of rows){const im=JSON.parse(r.data).images.find(x=>x.id===iid);if(im?.storagePath)return im;}
+    for(const r of rows){
+     const project=JSON.parse(r.data);
+     if(imageCdn && project.slug!=='03-s7cmf-eaaf3f58')continue;
+     const im=project.images.find(x=>x.id===iid);if(im?.storagePath)return im;
+    }
    };
    const im=lookup();if(!im)fail('图片不存在',404);
    const sizes=url.searchParams.getAll('width'),width=sizes.length?Number(sizes[0]):null;
@@ -125,8 +131,8 @@ async function handle(req,res){
    let bytes;try{bytes=await readFile(file);}catch{fail('图片不存在',404);}
    // Recheck after asynchronous work: unpublishing/deletion takes effect before delivery/304.
    if(!lookup()||(current&&!session(req)))fail('图片不存在',404);
-   res.setHeader('Vary','Cookie');
-   res.setHeader('Cache-Control',current?'private, no-store':'public, max-age=0, must-revalidate');
+   if(!imageCdn)res.setHeader('Vary','Cookie');
+   res.setHeader('Cache-Control',imageCdn?'public, max-age=0, s-maxage=60, must-revalidate':current?'private, no-store':'public, max-age=0, must-revalidate');
    const etag='"'+createHash('sha256').update(bytes).digest('hex')+'"';res.setHeader('ETag',etag);
    if(req.headers['if-none-match']===etag){res.writeHead(304);return res.end();}
    res.writeHead(200,{'Content-Type':width===null?im.contentType:'image/webp','Content-Length':bytes.length});

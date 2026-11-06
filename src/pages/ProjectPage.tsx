@@ -78,6 +78,7 @@ export function ProjectPage() {
 
       {!isVideoProject && lightboxIndex !== null && (
         <Lightbox
+          useImageCdn={project.slug === "03-s7cmf-eaaf3f58"}
           images={project.images}
           index={lightboxIndex}
           onChange={changeLightbox}
