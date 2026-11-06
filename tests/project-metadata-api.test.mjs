@@ -57,12 +57,17 @@ test('optional project metadata is validated and persists across server restarts
       const insert = db.prepare('INSERT INTO projects VALUES(?,?,?,?,?)');
       for (let i = 0; i < 7; i++) {
         const id = 'legacy-' + i;
-        const p = { ...draft, id, slug: id, cover: {src: '/cover.jpg'}, images: [], published: i !== 0 };
+        const cover = { src: '/cover.jpg', alt: 'old filename', credit: 'old caption' };
+        const p = { ...draft, id, slug: id, cover, images: [cover, { src: '/second.jpg' }], credits: 'Project team', published: i !== 0 };
         insert.run(id, id, JSON.stringify(p), Number(p.published), i);
       }
     } finally { db.close(); }
     await start();
     await login();
+    const [legacy] = await (await request('/api/projects')).json();
+    assert.deepEqual(legacy.cover, { src: '/cover.jpg' });
+    assert.deepEqual(legacy.images, [legacy.cover, { src: '/second.jpg' }]);
+    assert.equal(legacy.credits, 'Project team');
     const featuredIds = async () => (await (await request('/api/projects')).json()).filter(p => p.featured).map(p => p.id);
     assert.deepEqual(await featuredIds(), ['legacy-1','legacy-2','legacy-3','legacy-4']);
     for (const i of [5, 6]) {

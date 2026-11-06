@@ -29,7 +29,7 @@ export function ProjectPage() {
   return (
     <main className={`project-page${isVideoProject ? " project-watch-page" : ""}`}>
       {isVideoProject ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
-        <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt={project.cover.alt} width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
+        <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt="" width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
         <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
         <div className="project-hero-title">
@@ -52,11 +52,10 @@ export function ProjectPage() {
       {!isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
           <Reveal key={image.src} className={`gallery-shot gallery-shot-${(index % 5) + 1}`}>
-            <button type="button" onClick={() => setLightboxIndex(index)} aria-label={`查看大图：${image.alt}`}>
-              <img {...responsiveImage(image.src, [960, 1600], projectGallerySizes(index), image.width)} alt={image.alt} width={image.width} height={image.height} loading="lazy" decoding="async" />
+            <button type="button" onClick={() => setLightboxIndex(index)} aria-label={`查看第 ${index + 1} 张大图`}>
+              <img {...responsiveImage(image.src, [960, 1600], projectGallerySizes(index), image.width)} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" />
               <span className="shot-expand"><Maximize2 aria-hidden="true" /></span>
             </button>
-            {image.credit && <p>{image.credit}</p>}
           </Reveal>
         ))}
       </section>}

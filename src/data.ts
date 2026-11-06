@@ -5,8 +5,6 @@ export type ProjectImage = {
   id?: string;
   src: string;
   storagePath?: string;
-  alt: string;
-  credit?: string;
   width?: number;
   height?: number;
 };

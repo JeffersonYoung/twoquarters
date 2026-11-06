@@ -50,8 +50,7 @@ export function Lightbox({
         <ChevronLeft aria-hidden="true" />
       </button>
       <figure className="lightbox-figure">
-        <img src={image.src} alt={image.alt} />
-        <figcaption>{image.alt}{image.credit ? ` · ${image.credit}` : ""}</figcaption>
+        <img src={image.src} alt={`作品图片 ${index + 1}`} />
       </figure>
       <button
         className="lightbox-arrow lightbox-next"

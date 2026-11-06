@@ -28,6 +28,16 @@ db.exec(`
    json(CASE WHEN id IN (SELECT id FROM previous_home) THEN 'true' ELSE 'false' END))
  WHERE json_type(data,'$.featured') IS NULL
 `);
+// Remove legacy image captions from both stored copies, keeping gallery order and project credits.
+db.exec(`
+ UPDATE projects SET data=json_remove(json_set(data, '$.images', (
+   SELECT json_group_array(json_remove(image.value,'$.alt','$.credit') ORDER BY image.key)
+   FROM json_each(projects.data,'$.images') AS image
+ )), '$.cover.alt', '$.cover.credit')
+ WHERE json_type(data,'$.cover.alt') IS NOT NULL OR json_type(data,'$.cover.credit') IS NOT NULL
+ OR EXISTS (SELECT 1 FROM json_each(data,'$.images') AS image
+            WHERE json_type(image.value,'$.alt') IS NOT NULL OR json_type(image.value,'$.credit') IS NOT NULL)
+`);
 await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const json=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
@@ -154,7 +164,7 @@ async function handle(req,res){
       clean=await decoder.autoOrient().toFormat(meta.format,{quality:95}).toBuffer();
       const normalized=await sharp(clean).metadata();dimensions={width:normalized.width,height:normalized.pageHeight||normalized.height};
      }catch(e){if(e.status)throw e;fail('图片损坏或不能解码');}
-     const iid=randomUUID();images.push({id:iid,storagePath:iid,src:'/api/images/'+iid,alt:file.name.replace(/\.[^.]+$/,'').slice(0,160),contentType:file.type,...dimensions,bytes:clean});
+     const iid=randomUUID();images.push({id:iid,storagePath:iid,src:'/api/images/'+iid,contentType:file.type,...dimensions,bytes:clean});
     }
     const written=[];try{
      for(const im of images){await writeFile(path.join(dataDir,'uploads',im.id),im.bytes,{flag:'wx',mode:0o600});written.push(im.id);await prepareImageVariants(dataDir,im.id);delete im.bytes;}

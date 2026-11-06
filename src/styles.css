@@ -861,12 +861,6 @@ main {
   opacity: 1;
 }
 
-.gallery-shot > p {
-  margin-top: 9px;
-  color: var(--muted);
-  font-size: 0.62rem;
-}
-
 .project-credit {
   display: grid;
   grid-template-columns: 1fr 4fr;
@@ -991,13 +985,6 @@ main {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-}
-
-.lightbox-figure figcaption {
-  position: absolute;
-  bottom: -32px;
-  color: rgb(255 255 255 / 0.62);
-  font-size: 0.65rem;
 }
 
 .lightbox-arrow {
@@ -1680,13 +1667,6 @@ main {
     right: 16px;
   }
 
-  .lightbox-figure figcaption {
-    right: 0;
-    bottom: -30px;
-    left: 0;
-    text-align: center;
-  }
-
   .about-intro {
     min-height: 620px;
   }
@@ -2116,9 +2096,8 @@ main {
 .admin-image-grid article { position: relative; min-width: 0; overflow: hidden; border: 1px solid #d0d3d1; border-radius: 4px; background: #fff; }
 .admin-image-grid figure { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: #dfe1df; }
 .admin-image-grid img { width: 100%; height: 100%; object-fit: contain; }
-.image-card-info { display: grid; grid-template-columns: 24px 1fr; gap: 5px; min-height: 58px; padding: 10px; }
+.image-card-info { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 5px; padding: 10px; }
 .image-card-info > span { color: #8a8f90; font-size: 0.58rem; }
-.image-card-info p { overflow: hidden; font-size: 0.67rem; text-overflow: ellipsis; white-space: nowrap; }
 .image-card-info em { grid-column: 2; display: inline-flex; width: max-content; align-items: center; gap: 4px; color: #a56a00; font-size: 0.57rem; font-style: normal; }
 .image-card-info em svg { width: 11px; fill: currentColor; }
 

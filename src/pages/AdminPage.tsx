@@ -615,10 +615,9 @@ export function AdminPage() {
                   const isCover = selected.cover?.id === image.id || selected.cover?.src === image.src;
                   return (
                     <article key={image.id || image.src}>
-                      <figure><img src={imageVariant(image.src, 480)} alt={image.alt} loading="lazy" decoding="async" /></figure>
+                      <figure><img src={imageVariant(image.src, 480)} alt={`图片 ${index + 1}`} loading="lazy" decoding="async" /></figure>
                       <div className="image-card-info">
                         <span>{String(index + 1).padStart(2, "0")}</span>
-                        <p title={image.alt}>{image.alt}</p>
                         {isCover && <em><Star aria-hidden="true" /> 封面</em>}
                       </div>
                       <div className="image-card-actions">
