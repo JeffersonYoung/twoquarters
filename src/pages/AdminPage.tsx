@@ -56,6 +56,7 @@ const emptyDraft: ProjectDraft = {
   photographer: "",
   retouchTeam: "",
   published: false,
+  featured: false,
 };
 
 type EditorState = {
@@ -79,6 +80,7 @@ function projectDraft(project: AdminProject): ProjectDraft {
     photographer: project.photographer || "",
     retouchTeam: project.retouchTeam || "",
     published: project.published,
+    featured: project.featured === true,
   };
 }
 
@@ -519,7 +521,7 @@ export function AdminPage() {
             >
               <span>{project.title}</span>
               <small>{project.images.length} 张</small>
-              <i className={project.published ? "published" : "draft"}>{project.published ? "已发布" : "草稿"}</i>
+              <i className={project.published ? "published" : "draft"}>{project.published ? "已发布" : "草稿"}{project.featured && " · 精选"}</i>
             </button>
           ))}
         </nav>
@@ -572,6 +574,12 @@ export function AdminPage() {
                 />
                 <span><Check aria-hidden="true" /></span>
                 允许在公开网站展示
+              </label>
+              <label className="publish-toggle">
+                <input type="checkbox" checked={draft.featured}
+                  onChange={(event) => updateDraft("featured", event.target.checked)} />
+                <span><Check aria-hidden="true" /></span>
+                首页精选（发布后展示）
               </label>
             </fieldset>
             <div className="editor-actions">

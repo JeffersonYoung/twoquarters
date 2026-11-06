@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -51,11 +52,30 @@ test('optional project metadata is validated and persists across server restarts
   try {
     execFileSync(process.execPath, ['scripts/database.mjs', 'init', '--maintenance'], { env });
     execFileSync(process.execPath, ['scripts/admin.mjs', 'metadata-admin', '--stdin'], { env, input: 'Test-only-metadata-password-2026\n' });
+    const db = new DatabaseSync(path.join(directory, 'portfolio.sqlite'));
+    try {
+      const insert = db.prepare('INSERT INTO projects VALUES(?,?,?,?,?)');
+      for (let i = 0; i < 7; i++) {
+        const id = 'legacy-' + i;
+        const p = { ...draft, id, slug: id, cover: {src: '/cover.jpg'}, images: [], published: i !== 0 };
+        insert.run(id, id, JSON.stringify(p), Number(p.published), i);
+      }
+    } finally { db.close(); }
     await start();
     await login();
+    const featuredIds = async () => (await (await request('/api/projects')).json()).filter(p => p.featured).map(p => p.id);
+    assert.deepEqual(await featuredIds(), ['legacy-1','legacy-2','legacy-3','legacy-4']);
+    for (const i of [5, 6]) {
+      const change = await request('/api/admin/projects/legacy-' + i, 'PATCH', { ...draft, published: true, featured: true });
+      assert.equal(change.status, 200);
+    }
+    assert.equal((await featuredIds()).length, 6);
+    const removed = await request('/api/admin/projects/legacy-1', 'PATCH', { ...draft, published: true, featured: false });
+    assert.equal(removed.status, 200);
     const response = await request('/api/admin/projects', 'POST', draft);
     assert.equal(response.status, 201);
     const created = await response.json();
+    assert.equal(created.featured, false);
     assert.equal(created.productionCompany, 'Twoquarters');
     for (const key of ['brand', 'agency', 'photographer', 'retouchTeam']) assert.equal(created[key], '');
     const route = `/api/admin/projects/${created.id}`;
@@ -74,6 +94,7 @@ test('optional project metadata is validated and persists across server restarts
     await stop();
     await start();
     await login();
+    assert.deepEqual(await featuredIds(), ['legacy-2','legacy-3','legacy-4','legacy-5','legacy-6']);
     const persisted = (await (await request('/api/admin/projects')).json()).find(item => item.id === created.id);
     for (const [key, value] of Object.entries(metadata)) assert.equal(persisted[key], value);
     assert.equal(persisted.productionCompany, 'Twoquarters');

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
 import { highPriorityImage, responsiveImage } from "../lib/images";
+import { localizedHref } from "../lib/language";
 import { useProjects } from "../ProjectsContext";
 import { Link } from "../router";
 
@@ -13,7 +14,8 @@ const capabilities = [
 
 export function HomePage({ english = false }: { english?: boolean }) {
   const { projects } = useProjects();
-  const featured = projects.slice(0, 4);
+  const featured = projects.filter((project) => project.featured);
+  const workLabel = featured.length ? (english ? "Selected work" : "精选作品") : (english ? "All work" : "全部作品");
 
   return (
     <main>
@@ -28,8 +30,8 @@ export function HomePage({ english = false }: { english?: boolean }) {
           <p>{english ? "Photography / CGI / Production" : "摄影 / CGI / 整合制作"}</p>
           <h1>TWO<br />QUARTERS</h1>
         </div>
-        <a className="hero-scroll" href="#work" aria-label={english ? "View selected work" : "查看精选作品"}>
-          <span>{english ? "Selected work" : "精选作品"}</span>
+        <a className="hero-scroll" href={featured.length ? "#work" : localizedHref("/works", english)}>
+          <span>{workLabel}</span>
           <ArrowDown aria-hidden="true" />
         </a>
       </section>
@@ -50,7 +52,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
         </p>
       </section>
 
-      <section className="selected-work" id="work">
+      <section className="selected-work" id="work" hidden={!featured.length}>
         <div className="section-heading">
           <span>01</span>
           <h2>{english ? "Selected work" : "精选作品"}</h2>

@@ -26,7 +26,7 @@ const project = {
 
 // Follow the repository's transpile-and-render convention without adding a test
 // framework. Only browser state/context is stubbed; actual image markup is rendered.
-function loadSource(entry, { admin = false, fixture = project, search = "" } = {}) {
+function loadSource(entry, { admin = false, fixture = project, projects = [fixture], search = "" } = {}) {
   const cache = new Map();
   const stubs = new Map([
     [path.join(root, 'lib/video-compression'), { compressVideo: async () => { throw new Error('Not invoked by static image rendering'); } }],
@@ -37,7 +37,7 @@ function loadSource(entry, { admin = false, fixture = project, search = "" } = {
       useLocation: () => ({ search }),
     }],
     [path.join(root, 'ProjectsContext'), {
-      useProjects: () => ({ projects: [fixture], loading: false, refresh: async () => {} }),
+      useProjects: () => ({ projects, loading: false, refresh: async () => {} }),
     }],
     [path.join(root, 'components/Reveal'), {
       Reveal: ({ children, className }) => React.createElement('div', { className }, children),
@@ -284,14 +284,18 @@ test('lightbox renders only the selected original, without preloading other orig
 });
 
 test('Home prioritizes the responsive static hero and defers all featured cards; About defers its image', () => {
-  const { HomePage } = loadSource('pages/HomePage.tsx');
+  const projects = Array.from({ length: 7 }, (_, i) => ({
+    ...project, slug: 'work-' + i, published: true, featured: i !== 3,
+  }));
+  const { HomePage } = loadSource('pages/HomePage.tsx', { projects });
   const [hero, ...cards] = imgTags(render(HomePage));
   assert.equal(attr(hero, 'src'), '/images/automotive/hero-mclaren-480.webp');
   assert.equal(attr(hero, 'sizes'), '100vw');
   assert.equal(attr(hero, 'loading'), 'eager');
   assert.equal(attr(hero, 'fetchPriority'), 'high');
   assert.ok(attr(hero, 'srcSet').includes('-1600.webp 1600w'));
-  assert.ok(cards.length > 0);
+  assert.equal(cards.length, 6);
+  assert.ok(!render(HomePage).includes('/works/work-3'));
   for (const card of cards) assert.equal(attr(card, 'loading'), 'lazy');
   const { AboutPage } = loadSource('pages/AboutPage.tsx');
   const [about] = imgTags(render(AboutPage));
