@@ -42,12 +42,12 @@ export function App() {
   else page = <Navigate to="/" replace />;
 
   return (
-    <>
+    <div className="public-site">
       <ScrollManager />
       <Header />
       {error && <div role="alert" className="portfolio-error">{error} <button onClick={() => void refresh()}>重试</button></div>}
       {page}
       <Footer />
-    </>
+    </div>
   );
 }

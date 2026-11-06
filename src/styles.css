@@ -6,6 +6,7 @@
   --white: #ffffff;
   --muted: #6f7476;
   --line: #c9ccca;
+  --brand-orange: #e76d00;
   --red: #f04432;
   --cyan: #8ee7e7;
   font-family: "Helvetica Neue", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
@@ -69,6 +70,20 @@ button:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--red);
   outline-offset: 4px;
+}
+
+.public-site {
+  color-scheme: dark;
+  --paper: var(--ink);
+  --muted: #b8b8b8;
+  --line: #555;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--white);
+}
+
+.site-footer a:focus-visible {
+  outline-color: currentColor;
 }
 
 .site-header {
@@ -279,7 +294,7 @@ main {
   align-items: baseline;
   gap: 24px;
   margin-bottom: 44px;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid currentColor;
   padding-top: 14px;
 }
 
@@ -343,7 +358,7 @@ main {
 .project-card figure {
   position: relative;
   overflow: hidden;
-  background: #d9dbda;
+  background: var(--ink-soft);
 }
 
 .project-card figure::after {
@@ -425,7 +440,7 @@ main {
   align-items: center;
   gap: 14px;
   margin-top: 80px;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid currentColor;
   padding-bottom: 7px;
   font-size: 0.82rem;
 }
@@ -525,14 +540,14 @@ main {
   align-items: center;
   justify-content: space-between;
   margin: 42px 0 0 auto;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid currentColor;
   padding-bottom: 9px;
   font-size: 0.8rem;
 }
 
 .site-footer {
   padding: 72px 28px 26px;
-  background: var(--red);
+  background: var(--brand-orange);
   color: var(--ink);
 }
 
@@ -546,7 +561,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid currentColor;
   padding-bottom: 18px;
   font-size: 4.1rem;
   font-weight: 650;
@@ -618,7 +633,7 @@ main {
   display: flex;
   gap: 30px;
   margin-bottom: 76px;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid currentColor;
   padding-top: 12px;
 }
 
@@ -638,8 +653,8 @@ main {
 }
 
 .filter-tabs button[aria-selected="true"] {
-  border-bottom: 1px solid var(--ink);
-  color: var(--ink);
+  border-bottom: 1px solid currentColor;
+  color: var(--white);
 }
 
 .works-grid {
@@ -719,8 +734,8 @@ main {
 
 .project-metadata {
   padding: 64px 28px;
-  background: var(--white);
-  color: #808080;
+  background: var(--paper);
+  color: var(--muted);
   font-family: "Times New Roman", "Noto Serif SC", serif;
   font-size: clamp(1.125rem, 1.6vw, 1.75rem);
   font-weight: 400;
@@ -814,7 +829,7 @@ main {
   overflow: hidden;
   border: 0;
   padding: 0;
-  background: #d9dbda;
+  background: var(--ink-soft);
   cursor: zoom-in;
 }
 
@@ -874,7 +889,7 @@ main {
 .project-pagination {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid currentColor;
 }
 
 .project-pagination a {
@@ -888,12 +903,12 @@ main {
 
 .project-pagination a:last-child {
   justify-content: flex-end;
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid currentColor;
   text-align: right;
 }
 
 .project-pagination a:hover {
-  background: var(--ink);
+  background: var(--ink-soft);
   color: var(--white);
 }
 
@@ -1097,11 +1112,11 @@ main {
 
 .service-link:hover,
 .service-link:focus-visible {
-  background-color: rgb(0 0 0 / 0.04);
+  background-color: rgb(255 255 255 / 0.08);
 }
 
 .service-link:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid currentColor;
   outline-offset: 4px;
 }
 
@@ -1123,8 +1138,8 @@ main {
 .about-numbers {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
 }
 
 .about-numbers > div {
@@ -1136,7 +1151,7 @@ main {
 }
 
 .about-numbers > div + div {
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid currentColor;
 }
 
 .about-numbers strong {
@@ -1153,7 +1168,7 @@ main {
   grid-template-columns: 1.3fr 0.7fr;
   gap: 10%;
   padding: 130px 28px 150px;
-  background: var(--cyan);
+  background: var(--ink-soft);
 }
 
 .contact-panel > div > span {
@@ -1184,7 +1199,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid currentColor;
   padding-bottom: 9px;
   font-size: 0.82rem;
 }
@@ -1719,7 +1734,7 @@ main {
   }
 
   .about-numbers > div + div {
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid currentColor;
     border-left: 0;
   }
 
@@ -2246,8 +2261,8 @@ main {
 .watch-selection { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .watch-selection a { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; border: 1px solid var(--line); padding: 12px 16px; font-size: 0.8rem; overflow-wrap: anywhere; }
 .watch-selection svg { width: 14px; height: 14px; flex: none; }
-.watch-selection a[aria-current="true"] { background: var(--ink); color: var(--white); }
-.watch-selection a:focus-visible, .watch-back:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.watch-selection a[aria-current="true"] { background: var(--white); color: var(--ink); }
+.watch-selection a:focus-visible, .watch-back:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .watch-error { margin-top: 12px; }
 .project-watch-page .project-information { max-width: 1500px; margin: 0 auto; padding: 32px 28px; gap: 6%; }
 .project-watch-page .project-summary { font-size: 1rem; line-height: 1.75; white-space: pre-line; overflow-wrap: anywhere; }
@@ -2280,7 +2295,7 @@ main {
   font-size: clamp(1.125rem, 1.6vw, 1.75rem);
   font-weight: 400;
   line-height: 1.45;
-  color: #808080;
+  color: var(--muted);
   text-align: left;
 }
 .project-watch-page .project-metadata dl {
