@@ -120,7 +120,6 @@ async function handle(req,res){
     const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();
     for(const r of rows){
      const project=JSON.parse(r.data);
-     if(imageCdn && project.slug!=='03-s7cmf-eaaf3f58')continue;
      const im=project.images.find(x=>x.id===iid);if(im?.storagePath)return im;
     }
    };

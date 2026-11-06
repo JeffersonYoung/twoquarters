@@ -4,13 +4,11 @@ import type { ProjectImage } from "../data";
 
 export function Lightbox({
   images,
-  useImageCdn = false,
   index,
   onChange,
   onClose,
 }: {
   images: ProjectImage[];
-  useImageCdn?: boolean;
   index: number;
   onChange: (index: number) => void;
   onClose: () => void;
@@ -34,7 +32,7 @@ export function Lightbox({
 
   const image = images[index];
   const original = image.src;
-  const src = useImageCdn && /^\/api\/images\/[a-f0-9-]{36}$/.test(original)
+  const src = /^\/api\/images\/[a-f0-9-]{36}$/.test(original)
     ? `https://img.twoquarters.com.cn${original}`
     : original;
 

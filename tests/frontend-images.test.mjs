@@ -289,7 +289,7 @@ test('lightbox renders only the selected original, without preloading other orig
     const markup = render(Lightbox, { images, index, onChange() {}, onClose() {} });
     const tags = imgTags(markup);
     assert.equal(tags.length, 1);
-    assert.equal(attr(tags[0], 'src'), images[index].src);
+    assert.equal(attr(tags[0], 'src'), 'https://img.twoquarters.com.cn' + images[index].src);
     assert.equal(attr(tags[0], 'srcSet'), undefined);
     assert.ok(!markup.includes('rel="preload"'));
     images.forEach((image, other) => { if (other !== index) assert.ok(!markup.includes(image.src)); });
