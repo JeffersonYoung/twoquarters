@@ -16,7 +16,11 @@ export function WorksPage() {
   const { search, hash = "", navigate } = useLocation();
   const category = new URLSearchParams(search).get("category");
   const filter: Filter = filters.find((item) => item.value === category)?.value ?? "all";
-  const visibleProjects = filter === "all" ? projects : projects.filter((project) => project.category === filter);
+  const visibleProjects = filter === "all"
+    ? [...projects].sort((a, b) =>
+        selectableCategories.indexOf(a.category) - selectableCategories.indexOf(b.category)
+        || (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+    : projects.filter((project) => project.category === filter);
 
   function setFilter(value: Filter) {
     const params = new URLSearchParams(search);

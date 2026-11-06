@@ -44,6 +44,7 @@ export type Project = {
   photographer?: string;
   retouchTeam?: string;
   published?: boolean;
+  publishedAt?: number;
   featured?: boolean;
 };
 

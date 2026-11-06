@@ -129,7 +129,12 @@ async function handle(req,res){
   const match=route.match(/^\/api\/admin\/projects\/([^/]+)(?:\/(cover|images)(?:\/([^/]+))?)?$/);
   if(match){
    const [,id,action,imageId]=match;
-   if(!action&&method==='PATCH'){const value=await input(req),p=getProject(id),d=draft(value,p);if(d.published&&!p.cover)fail('请先上传图片并设置封面');return json(res,save(Object.assign(p,d)));}
+   if(!action&&method==='PATCH'){
+    const value=await input(req),p=getProject(id),d=draft(value,p);
+    if(d.published&&!p.cover)fail('请先上传图片并设置封面');
+    if(d.published&&!p.published)p.publishedAt=Date.now();
+    return json(res,save(Object.assign(p,d)));
+   }
    if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
    if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,p);}

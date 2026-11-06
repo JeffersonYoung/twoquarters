@@ -70,6 +70,15 @@ test('optional project metadata is validated and persists across server restarts
       assert.equal(change.status, 200);
     }
     assert.equal((await featuredIds()).length, 6);
+    const publishRoute = '/api/admin/projects/legacy-0';
+    const published = await (await request(publishRoute, 'PATCH', { ...draft, published: true })).json();
+    assert.ok(Number.isSafeInteger(published.publishedAt));
+    const edited = await (await request(publishRoute, 'PATCH', { ...draft, published: true, publishedAt: 1 })).json();
+    assert.equal(edited.publishedAt, published.publishedAt);
+    await request(publishRoute, 'PATCH', { ...draft, published: false });
+    await delay(5);
+    const republished = await (await request(publishRoute, 'PATCH', { ...draft, published: true })).json();
+    assert.ok(republished.publishedAt > published.publishedAt);
     const removed = await request('/api/admin/projects/legacy-1', 'PATCH', { ...draft, published: true, featured: false });
     assert.equal(removed.status, 200);
     const response = await request('/api/admin/projects', 'POST', draft);
