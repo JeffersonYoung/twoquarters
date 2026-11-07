@@ -4,6 +4,7 @@ import { storageOverview } from './storage.mjs';
 import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
 import sharp from 'sharp';
 import { IMAGE_WIDTHS, imageVariant, prepareImageVariants, deleteImageFiles, stopImageQueue } from './images.mjs';
+import { putOriginal, deleteOriginal, publishedOriginal } from './oss.mjs';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { readFile, writeFile, stat } from 'node:fs/promises';
@@ -60,11 +61,20 @@ function draft(value,previous={}){
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.woff2':'font/woff2','.ico':'image/x-icon'};
 async function sendFile(req,res,file,type){let bytes;try{bytes=await readFile(file);}catch{fail('Not found',404);}res.writeHead(200,{'Content-Type':type||mime[path.extname(file)]||'application/octet-stream','Content-Length':bytes.length});res.end(req.method==='HEAD'?undefined:bytes);}
 let pendingLogins=0;
+async function removeOriginal(id) {
+ await deleteImageFiles(dataDir,id);
+ // The database has already revoked access. An OSS cleanup failure leaves only a private orphan.
+ try { await deleteOriginal(id); } catch { console.error('OSS image cleanup failed:',id); }
+}
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.twoquarters.com.cn blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
  // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
+ if(route==='/api/cdn-auth') {
+  const allowed=method==='GET' && publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']);
+  res.writeHead(allowed?200:403,{'Content-Length':'0'});return res.end();
+ }
  const imageCdn=req.headers['x-twoquarters-image-cdn']==='1';
  if(imageCdn && (!['GET','HEAD'].includes(method) || !/^\/api\/images\/[a-f0-9-]{36}$/.test(route) || url.search))fail('Not found',404);
  const adminTransport=!secure||trustedHTTPS(req);
@@ -150,9 +160,9 @@ async function handle(req,res){
     if(d.published&&!p.published)p.publishedAt=Date.now();
     return json(res,save(Object.assign(p,d)));
    }
-   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,{ok:true});}
+   if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await removeOriginal(im.id);return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
-   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await deleteImageFiles(dataDir,im.id);return json(res,p);}
+   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await removeOriginal(im.id);return json(res,p);}
    if(action==='images'&&!imageId&&method==='POST'){
     getProject(id);if(!req.headers['content-type']?.startsWith('multipart/form-data;'))fail('需要图片表单',415);
     const bytes=await body(req,64*1024*1024);let form;try{form=await new Request(origin,{method:'POST',headers:{'Content-Type':req.headers['content-type']},body:bytes}).formData();}catch{fail('图片表单格式不正确');}
@@ -172,9 +182,9 @@ async function handle(req,res){
      const iid=randomUUID();images.push({id:iid,storagePath:iid,src:'/api/images/'+iid,contentType:file.type,...dimensions,bytes:clean});
     }
     const written=[];try{
-     for(const im of images){await writeFile(path.join(dataDir,'uploads',im.id),im.bytes,{flag:'wx',mode:0o600});written.push(im.id);await prepareImageVariants(dataDir,im.id);delete im.bytes;}
+     for(const im of images){await writeFile(path.join(dataDir,'uploads',im.id),im.bytes,{flag:'wx',mode:0o600});written.push(im.id);await prepareImageVariants(dataDir,im.id);await putOriginal(im.id,im.bytes,im.contentType);delete im.bytes;}
      const p=getProject(id);p.images.push(...images);p.cover ||= images[0];save(p);return json(res,p);
-    }catch(e){await Promise.all(written.map(i=>deleteImageFiles(dataDir,i)));throw e;}
+    }catch(e){await Promise.allSettled(written.map(i=>removeOriginal(i)));throw e;}
    }
   }
   fail('未找到接口',404);
