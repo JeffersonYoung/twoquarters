@@ -89,6 +89,9 @@ test('optional project metadata is validated and persists across server restarts
     const response = await request('/api/admin/projects', 'POST', draft);
     assert.equal(response.status, 201);
     const created = await response.json();
+    assert.ok(Number.isSafeInteger(created.createdAt));
+    assert.equal(created.shotAt,created.createdAt);
+    assert.equal(created.updatedAt,created.createdAt);
     assert.equal(created.featured, false);
     assert.equal(created.productionCompany, 'Twoquarters');
     for (const key of ['brand', 'agency', 'photographer', 'retouchTeam']) assert.equal(created[key], '');
@@ -97,11 +100,21 @@ test('optional project metadata is validated and persists across server restarts
     const update = await request(route, 'PATCH', { ...draft, ...metadata, brand: ` ${metadata.brand} `, productionCompany: 'Override' });
     assert.equal(update.status, 200);
     const saved = await update.json();
+    assert.equal(saved.createdAt,created.createdAt);
+    assert.equal(saved.shotAt,created.shotAt);
+    assert.ok(saved.updatedAt>=created.updatedAt);
+    const shotAt=Date.parse('2023-08-15T04:30:00Z');
+    const shooting=await (await request(route,'PATCH',{...draft,shotAt,createdAt:1,updatedAt:1})).json();
+    assert.equal(shooting.shotAt,shotAt);
+    assert.equal(shooting.createdAt,created.createdAt);
+    assert.ok(shooting.updatedAt>1);
+    for(const invalid of [null,'2023-08-15',-1,1.5,253402300800000]) assert.equal((await request(route,'PATCH',{...draft,shotAt:invalid})).status,400);
     for (const [key, value] of Object.entries(metadata)) assert.equal(saved[key], value);
     assert.equal(saved.productionCompany, 'Twoquarters');
     const unrelatedUpdate = await request(route, 'PATCH', { ...draft, summary: 'Only update the introduction' });
     assert.equal(unrelatedUpdate.status, 200);
     const preserved = await unrelatedUpdate.json();
+    assert.equal(preserved.shotAt,shotAt);
     for (const [key, value] of Object.entries(metadata)) assert.equal(preserved[key], value);
     assert.equal((await request(route, 'PATCH', { ...draft, agency: 123 })).status, 400);
     assert.equal((await request(route, 'PATCH', { ...draft, brand: 'x'.repeat(201) })).status, 400);
@@ -110,6 +123,8 @@ test('optional project metadata is validated and persists across server restarts
     await login();
     assert.deepEqual(await featuredIds(), ['legacy-2','legacy-3','legacy-4','legacy-5','legacy-6']);
     const persisted = (await (await request('/api/admin/projects')).json()).find(item => item.id === created.id);
+    assert.equal(persisted.shotAt,shotAt);
+    assert.equal(persisted.createdAt,created.createdAt);
     for (const [key, value] of Object.entries(metadata)) assert.equal(persisted[key], value);
     assert.equal(persisted.productionCompany, 'Twoquarters');
   } finally {

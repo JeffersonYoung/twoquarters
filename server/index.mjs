@@ -5,6 +5,7 @@ import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVide
 import sharp from 'sharp';
 import { IMAGE_WIDTHS, imageVariant, prepareImageVariants, deleteImageFiles, stopImageQueue } from './images.mjs';
 import { putOriginal, deleteOriginal, publishedOriginal } from './oss.mjs';
+import { initializeProjectTimes, validTime } from './project-times.mjs';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { readFile, writeFile, stat } from 'node:fs/promises';
@@ -39,6 +40,7 @@ db.exec(`
  OR EXISTS (SELECT 1 FROM json_each(data,'$.images') AS image
             WHERE json_type(image.value,'$.alt') IS NOT NULL OR json_type(image.value,'$.credit') IS NOT NULL)
 `);
+initializeProjectTimes(db);
 await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const json=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
@@ -48,14 +50,16 @@ async function body(req,max=64*1024){
 }
 async function input(req){if(!req.headers['content-type']?.startsWith('application/json'))fail('需要 JSON',415);try{return JSON.parse(await body(req));}catch(e){if(e.status)throw e;fail('JSON 格式不正确');}}
 function getProject(id){const r=db.prepare('SELECT * FROM projects WHERE id=?').get(id);if(!r)fail('作品不存在',404);return JSON.parse(r.data);}
-function save(p){db.prepare('UPDATE projects SET data=?,published=? WHERE id=?').run(JSON.stringify(p),p.published?1:0,p.id);return p;}
+function save(p){p.updatedAt=Date.now();db.prepare('UPDATE projects SET data=?,published=? WHERE id=?').run(JSON.stringify(p),p.published?1:0,p.id);return p;}
 function draft(value,previous={}){
  if(!value||typeof value!=='object'||Array.isArray(value))fail('资料格式不正确');
  value={brand:previous.brand||'',agency:previous.agency||'',photographer:previous.photographer||'',retouchTeam:previous.retouchTeam||'',...value};
  if(value.featured !== undefined && typeof value.featured !== 'boolean')fail('精选状态格式不正确');
+ if(value.shotAt!==undefined && !validTime(value.shotAt))fail('请填写有效的拍摄时间');
  const d={featured:value.featured ?? previous.featured ?? false};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000,brand:200,agency:200,photographer:200,retouchTeam:200})){
   if(value[key]!=null&&typeof value[key]!=='string')fail('文字资料格式不正确');d[key]=(value[key]||'').trim();if(d[key].length>max)fail('文字过长');
  }
+ if(value.shotAt!==undefined)d.shotAt=value.shotAt;
  if(!d.title||!['automotive','cg-ai','fmcg','video','bts'].includes(d.category))fail('请填写标题和有效分类');d.productionCompany='Twoquarters';d.published=value.published===true;return d;
 }
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.woff2':'font/woff2','.ico':'image/x-icon'};
@@ -112,7 +116,7 @@ async function handle(req,res){
   }
   if((route==='/api/projects'||route==='/api/admin/projects')&&method==='GET'){
    const rows=db.prepare('SELECT data FROM projects'+(route==='/api/projects'?' WHERE published=1':'')+' ORDER BY sort_order,rowid DESC').all();
-   return json(res,rows.map(r=>projectVideos(JSON.parse(r.data),route==='/api/admin/projects')).filter(p=>route!=='/api/projects'||p.cover));
+   return json(res,rows.map(r=>projectVideos(JSON.parse(r.data),route==='/api/admin/projects')).filter(p=>route!=='/api/projects'||p.cover).sort((a,b)=>(b.shotAt??0)-(a.shotAt??0)));
   }
   if(route.startsWith('/api/videos/')&&(method==='GET'||method==='HEAD')) {
    const id=route.slice(12); if(!/^[a-f0-9-]{36}$/.test(id))fail('视频不存在',404);
@@ -121,8 +125,8 @@ async function handle(req,res){
   const videoRoute=route.match(/^\/api\/admin\/projects\/([^/]+)\/videos(?:\/([^/]+))?$/);
   if(videoRoute) {
    const [,pid,vid]=videoRoute; getProject(pid);
-   if(!vid&&method==='POST') { await uploadVideo(req,pid); return json(res,projectVideos(getProject(pid),true),202); }
-   if(vid&&method==='DELETE') { await deleteVideo(pid,vid); return json(res,projectVideos(getProject(pid),true)); }
+   if(!vid&&method==='POST') { await uploadVideo(req,pid); return json(res,projectVideos(save(getProject(pid)),true),202); }
+   if(vid&&method==='DELETE') { await deleteVideo(pid,vid); return json(res,projectVideos(save(getProject(pid)),true)); }
   }
   if(route.startsWith('/api/images/')&&(method==='GET'||method==='HEAD')){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
@@ -149,7 +153,8 @@ async function handle(req,res){
   }
   if(route==='/api/admin/projects'&&method==='POST'){
    const d=draft(await input(req)),id=randomUUID();const slug=((d.titleEn||d.title).toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/[\s-]+/g,'-')||'project')+'-'+id.slice(0,8);
-   const p={...d,id,slug,published:false,cover:null,images:[]};db.prepare('INSERT INTO projects VALUES(?,?,?,?,?)').run(id,slug,JSON.stringify(p),0,-Date.now());return json(res,p,201);
+   const createdAt=Date.now();
+   const p={...d,id,slug,published:false,cover:null,images:[],createdAt,updatedAt:createdAt,shotAt:d.shotAt??createdAt};db.prepare('INSERT INTO projects VALUES(?,?,?,?,?)').run(id,slug,JSON.stringify(p),0,-createdAt);return json(res,p,201);
   }
   const match=route.match(/^\/api\/admin\/projects\/([^/]+)(?:\/(cover|images)(?:\/([^/]+))?)?$/);
   if(match){

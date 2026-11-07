@@ -19,8 +19,8 @@ export function WorksPage() {
   const visibleProjects = filter === "all"
     ? [...projects].sort((a, b) =>
         selectableCategories.indexOf(a.category) - selectableCategories.indexOf(b.category)
-        || (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
-    : projects.filter((project) => project.category === filter);
+        || (b.shotAt ?? 0) - (a.shotAt ?? 0))
+    : projects.filter((project) => project.category === filter).sort((a, b) => (b.shotAt ?? 0) - (a.shotAt ?? 0));
 
   function setFilter(value: Filter) {
     const params = new URLSearchParams(search);

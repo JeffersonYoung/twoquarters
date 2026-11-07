@@ -72,6 +72,7 @@ function projectDraft(project: AdminProject): ProjectDraft {
     titleEn: project.titleEn,
     category: project.category,
     year: project.year,
+    shotAt: project.shotAt ?? undefined,
     discipline: project.discipline,
     summary: project.summary,
     credits: project.credits || "",
@@ -87,6 +88,12 @@ function projectDraft(project: AdminProject): ProjectDraft {
 function editorFor(project: AdminProject | null): EditorState {
   const draft = project ? projectDraft(project) : { ...emptyDraft };
   return { selectedSlug: project?.slug || null, draft, savedDraft: draft, creating: false };
+}
+
+function localDateTime(value?: number | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(value - date.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
 }
 
 export function AdminPage() {
@@ -557,6 +564,7 @@ export function AdminPage() {
                 </select>
               </label>
               <label>年份<input value={draft.year} required maxLength={8} onChange={(event) => updateDraft("year", event.target.value)} /></label>
+              <label>拍摄时间<input type="datetime-local" step="1" required={!!selected} value={localDateTime(draft.shotAt)} onChange={(event) => updateDraft("shotAt", event.target.value ? new Date(event.target.value).getTime() : undefined)} /><small>{selected ? "用于作品排序，按当前设备时区填写" : "留空时使用项目创建时间"}</small></label>
               <label className="wide">服务内容<input value={draft.discipline} required onChange={(event) => updateDraft("discipline", event.target.value)} /></label>
               <label className="wide">项目简介<textarea rows={4} value={draft.summary} onChange={(event) => updateDraft("summary", event.target.value)} /></label>
               <label className="wide">项目署名<input value={draft.credits} onChange={(event) => updateDraft("credits", event.target.value)} /></label>

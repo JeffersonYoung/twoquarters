@@ -43,6 +43,9 @@ export type Project = {
   retouchTeam?: string;
   published?: boolean;
   publishedAt?: number;
+  createdAt?: number;
+  updatedAt?: number | null;
+  shotAt?: number | null;
   featured?: boolean;
 };
 

@@ -158,17 +158,19 @@ test('Works selects the URL category and shows only matching projects', () => {
   assert.ok(!render(WorksPage).includes('href="/works/fixture"'));
 });
 
-test('All works groups by category then latest publication, preserving legacy ties', () => {
+test('Works sorts by shooting time, independent of update/publication, preserving category order and ties', () => {
   const rows = [
     ['behind', 'bts', 30], ['legacy-a', 'automotive'], ['video', 'video', 80],
     ['older', 'automotive', 10], ['consumer', 'fmcg', 90], ['legacy-b', 'automotive'],
     ['cgi', 'cg-ai', 20], ['latest', 'automotive', 100],
   ];
-  const projects = rows.map(([slug, category, publishedAt]) => ({ ...project, slug, category, publishedAt }));
+  const projects = rows.map(([slug, category, shotAt], index) => ({ ...project, slug, category, shotAt, publishedAt: 1000-index, updatedAt: 1000-index }));
   const { WorksPage } = loadSource('pages/WorksPage.tsx', { projects });
   const links = [...render(WorksPage).matchAll(/href="\/works\/([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(links, ['latest', 'older', 'legacy-a', 'legacy-b', 'cgi', 'consumer', 'video', 'behind']);
   assert.deepEqual(projects.map(p => p.slug), rows.map(row => row[0]));
+  const filtered = loadSource('pages/WorksPage.tsx', { projects, search: '?category=automotive' });
+  assert.deepEqual([...render(filtered.WorksPage).matchAll(/href="\/works\/([^"]+)"/g)].map(match=>match[1]), ['latest','older','legacy-a','legacy-b']);
 });
 
 test('Works falls back to all projects for an unknown category', () => {
