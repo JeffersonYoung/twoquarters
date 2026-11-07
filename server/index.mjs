@@ -55,7 +55,7 @@ function draft(value,previous={}){
  if(!value||typeof value!=='object'||Array.isArray(value))fail('资料格式不正确');
  value={brand:previous.brand||'',agency:previous.agency||'',photographer:previous.photographer||'',retouchTeam:previous.retouchTeam||'',...value};
  if(value.featured !== undefined && typeof value.featured !== 'boolean')fail('精选状态格式不正确');
- if(value.shotAt!==undefined && !validTime(value.shotAt))fail('请填写有效的拍摄时间');
+ if(value.shotAt!==undefined && !(value.shotAt===null&&previous.shotAt===null) && !validTime(value.shotAt))fail('请填写有效的拍摄时间');
  const d={featured:value.featured ?? previous.featured ?? false};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000,brand:200,agency:200,photographer:200,retouchTeam:200})){
   if(value[key]!=null&&typeof value[key]!=='string')fail('文字资料格式不正确');d[key]=(value[key]||'').trim();if(d[key].length>max)fail('文字过长');
  }

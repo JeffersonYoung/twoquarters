@@ -68,6 +68,7 @@ test('optional project metadata is validated and persists across server restarts
     assert.deepEqual(legacy.cover, { src: '/cover.jpg' });
     assert.deepEqual(legacy.images, [legacy.cover, { src: '/second.jpg' }]);
     assert.equal(legacy.credits, 'Project team');
+    assert.equal((await request('/api/admin/projects/'+legacy.id,'PATCH',legacy)).status,200);
     const featuredIds = async () => (await (await request('/api/projects')).json()).filter(p => p.featured).map(p => p.id);
     assert.deepEqual(await featuredIds(), ['legacy-1','legacy-2','legacy-3','legacy-4']);
     for (const i of [5, 6]) {
