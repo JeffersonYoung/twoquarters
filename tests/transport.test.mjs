@@ -54,14 +54,19 @@ test('production public HTTP works; admin HTTP and spoofed proxy credentials fai
    child.once('exit',code=>{clearTimeout(timer);reject(new Error(`Server exited ${code}: ${logs}`));});
    child.stdout.on('data',data=>{const match=String(data).match(/listening on [^:]+:(\d+)/);if(match){clearTimeout(timer);resolve(Number(match[1]));}});
   });
-  const req=(route,{https=false,peer='127.0.0.1',method='GET',auth=false,origin=adminOrigin,host='portfolio.example.test',proto,body}={})=>new Promise((resolve,reject)=>{
-   const headers={Host:host};if(https||proto)headers['X-Forwarded-Proto']=proto||'https';
+  const req=(route,{https=false,peer='127.0.0.1',method='GET',auth=false,origin=adminOrigin,host='portfolio.example.test',proto,body,extraHeaders={}}={})=>new Promise((resolve,reject)=>{
+   const headers={Host:host,...extraHeaders};if(https||proto)headers['X-Forwarded-Proto']=proto||'https';
    if(auth){headers.Cookie='tq_session='+token;headers['X-CSRF-Token']=csrf;}
    if(method!=='GET'){headers.Origin=origin;headers['Content-Type']='application/json';}
    const r=http.request({host:'127.0.0.1',port,path:route,localAddress:peer,method,headers},res=>{let text='';res.on('data',d=>text+=d);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,text}));});r.on('error',reject);r.end(body&&JSON.stringify(body));
   });
   for(const https of [false,true])for(const route of ['/','/api/site-config','/api/projects','/api/images/'+image('1'),'/api/videos/'+image('1')]) {
    const r=await req(route,{https});assert.equal(r.status,200,route);assert.equal(r.headers['strict-transport-security'],undefined);assert.equal(r.headers.location,undefined);
+  }
+  assert.equal((await req('/api/cdn-auth')).status,403);
+  for(const [id,status] of [['1',200],['2',403]]) {
+   const check=await req('/api/cdn-auth',{https:true,auth:true,extraHeaders:{'X-TQ-Original-Uri':'/api/images/'+image(id),'X-TQ-Original-Method':'GET'}});
+   assert.equal(check.status,status);assert.equal(check.text,'');assert.equal(check.headers['cache-control'],'no-store');
   }
   for(const route of ['/admin','/admin/anything','/%61dmin','/api/admin/projects','/api/login'])assert.equal((await req(route,{auth:true})).status,403,route);
   for(const https of [false,true])for(const kind of ['images','videos'])assert.equal((await req('/api/'+kind+'/'+image('2'),{https})).status,404);
