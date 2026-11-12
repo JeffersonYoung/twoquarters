@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
-import { highPriorityImage, responsiveImage } from "../lib/images";
+import { HomeCarousel } from "../components/HomeCarousel";
 import { localizedHref } from "../lib/language";
 import { useProjects } from "../ProjectsContext";
 import { Link } from "../router";
@@ -20,7 +20,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
   return (
     <main>
       <section className="home-hero">
-        <img {...responsiveImage("/images/automotive/hero-mclaren.jpg", [480, 960, 1600], "100vw")} {...highPriorityImage} alt={english ? "Red supercar in motion" : "行驶中的红色超级跑车"} loading="eager" decoding="async" />
+        <HomeCarousel english={english} />
         <div className="hero-shade" />
         <div className="hero-topline">
           <span>{english ? "Independent image production" : "独立影像制作机构"}</span>

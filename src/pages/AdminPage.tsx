@@ -1,4 +1,5 @@
 import { StorageOverview } from "../components/StorageOverview";
+import { HomeCarouselAdmin } from "./HomeCarouselAdmin";
 import {
   ArrowUpRight,
   AlertCircle,
@@ -96,7 +97,7 @@ function localDateTime(value?: number | null) {
   return new Date(value - date.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
 }
 
-export function AdminPage() {
+export function AdminPage({ homeEditor = false }: { homeEditor?: boolean }) {
   const { refresh: refreshPublishedProjects } = useProjects();
   const [session, setSession] = useState<"checking" | "guest" | "authenticated">("checking");
   const [loginError, setLoginError] = useState("");
@@ -497,6 +498,7 @@ export function AdminPage() {
     );
   }
 
+  if (homeEditor) return <HomeCarouselAdmin logout={() => void logout()} />;
   return (
     <main className="admin-shell">
       <header className="admin-topbar">
@@ -505,6 +507,7 @@ export function AdminPage() {
         </button>
         <span className="admin-brand">TWOQUARTERS <i>ADMIN</i></span>
         <div>
+          <Link to="/admin/home" onClick={event => { if (!canLeaveDraft()) event.preventDefault(); }}>首页轮播</Link>
           <Link to="/" target="_blank">查看网站 <ArrowUpRight aria-hidden="true" /></Link>
           <button type="button" onClick={() => void logout()} disabled={locked}><LogOut aria-hidden="true" /> 退出</button>
         </div>

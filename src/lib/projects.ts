@@ -103,3 +103,10 @@ export type StorageOverview = {
   video: { reserveBytes: number; maxFileBytes: number; activeJobs: number; requiredBytes: number; availableBytes: number; hasSpaceForNextUpload: boolean };
 };
 export const getStorageOverview = (signal?: AbortSignal) => api<StorageOverview>("/admin/storage", "GET", undefined, signal);
+
+export type HomeSlide = { id: string; name: string; alt: string; enabled: boolean; variants: { id: string; src: string; width: number; height: number }[] };
+export type HomeCarouselConfig = { revision: number; interval: number; slides: HomeSlide[] };
+export const getHomeCarousel = () => api<HomeCarouselConfig>("/admin/home-carousel");
+export const saveHomeCarousel = (value: HomeCarouselConfig) => api<HomeCarouselConfig>("/admin/home-carousel", "PATCH", value);
+export const uploadHomeSlide = (file: File) => api<HomeCarouselConfig>("/admin/home-carousel/images", "POST", file);
+export const deleteHomeSlide = (id: string, revision: number) => api<HomeCarouselConfig>(`/admin/home-carousel/images/${encodeURIComponent(id)}`, "DELETE", { revision });

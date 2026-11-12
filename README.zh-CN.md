@@ -197,6 +197,14 @@ Docker 可选启用（原始 Compose 无配置文件也能运行）：
 
 ## 缩略图与响应式图片
 
+### 首页轮播管理
+
+登录后访问 `/admin/home`（项目管理页也有入口）。支持批量上传 JPEG/PNG/WebP、展示开关、上下调整顺序、删除和 3–30 秒轮播间隔。上传图片默认隐藏，修改后点击“保存设置”公开；无展示图片时保留默认首页图。首页支持自动播放、暂停、前后切换及触屏滑动；页面不可见、鼠标停留或系统要求减少动态效果时暂停自动播放。
+
+接口：公开 `GET /api/home-carousel`；管理员 `GET/PATCH /api/admin/home-carousel`、`POST /api/admin/home-carousel/images`（原始图片请求体、对应 Content-Type、URL 编码的 X-Upload-Name）、`DELETE /api/admin/home-carousel/images/:id`（JSON `{revision}`）。写入需要现有登录 Cookie、同源 Origin 和 X-CSRF-Token。PATCH 提交 `{revision, interval, slides:[{id,enabled,alt}]}` 完整有序列表；并发修改返回 409，重新读取后编辑。
+
+配置保存于 `DATA_DIR/home-carousel.json`，备份时须与数据库、uploads 一起保存。每张最大 40 MB、8000 万像素，仅静态图片；生成 480/1280/2560 宽的 sRGB WebP，不放大小图。配置 OSS 时展示图上传同一私有桶的 `api/images/` 前缀，线上前端使用 `img.twoquarters.com.cn`；CDN 远程鉴权仅放行已启用轮播图片。隐藏或删除立即撤销后续公开访问，已经下载到用户设备的图片无法撤回。首页图片独立于项目列表，不改变项目排序或精选状态。
+
 索引卡片及后台预览使用本地 WebP 缩略图，详情页按屏幕选择较大尺寸，只有打开灯箱才请求保留的原图。固定宽度为 480、960、1600 像素，不放大小图，自动修正 EXIF 方向并去除元数据。动图缩略图为首帧，原图保留动画。新上传先安全解码、重新编码，再生成三档尺寸；首页及关于页的静态图由 `npm run build` 的 prebuild 自动生成，无外部图片服务。
 
 现有图片无需重新导入或重新发布：首次请求时按需生成缺少的尺寸，并缓存到磁盘；同时最多处理 2 个任务、排队 32 个任务，同一尺寸并发请求合并，繁忙时返回 503。仅允许上述固定尺寸。若希望提前生成以避免首访等待，请先停止应用、备份数据，再用相同 DATA_DIR 执行 `npm run images:prepare`；Docker 使用 `docker compose run --rm portfolio npm run images:prepare`。该命令可重复执行，不会导入样例、发布或修改项目。显式导入样例后也可以运行它；已有内容时不要再次运行 samples:init。

@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import { IMAGE_WIDTHS, imageVariant, prepareImageVariants, deleteImageFiles, stopImageQueue } from './images.mjs';
 import { putOriginal, deleteOriginal, publishedOriginal } from './oss.mjs';
 import { initializeProjectTimes, validTime } from './project-times.mjs';
+import { createHomeCarousel } from './home-carousel.mjs';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { readFile, writeFile, stat } from 'node:fs/promises';
@@ -20,6 +21,7 @@ const secure=origin.startsWith('https://');
 const trustedHTTPS=transportPolicy(origin,process.env.TRUSTED_PROXY_IPS);
 const cookie=(value,maxAge)=>`tq_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;
 const siteConfig = await loadSiteConfig();
+const homeCarousel = await createHomeCarousel(dataDir);
 // Initialize only legacy records, preserving the former homepage on the first rollout.
 db.exec(`
  WITH previous_home AS MATERIALIZED (
@@ -76,7 +78,7 @@ async function handle(req,res){
  // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
  if(route==='/api/cdn-auth') {
-  const allowed=method==='GET' && publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']);
+  const allowed=method==='GET' && (publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCarousel.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']));
   res.writeHead(allowed?200:403,{'Content-Length':'0'});return res.end();
  }
  const imageCdn=req.headers['x-twoquarters-image-cdn']==='1';
@@ -110,6 +112,18 @@ async function handle(req,res){
   }
   if(route==='/api/logout'&&method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(current.token);res.setHeader('Set-Cookie',cookie('',0));return json(res,{ok:true});}
   if(route.startsWith('/api/admin/')&&!current)fail('请先登录',401);
+  if(route==='/api/home-carousel'&&method==='GET')return json(res,homeCarousel.snapshot());
+  if(route==='/api/admin/home-carousel'){
+   if(method==='GET')return json(res,homeCarousel.snapshot(true));
+   if(method==='PATCH')return json(res,await homeCarousel.update(await input(req)));
+  }
+  if(route==='/api/admin/home-carousel/images'&&method==='POST'){
+   if(!['image/jpeg','image/png','image/webp'].includes(req.headers['content-type']))fail('请上传 JPEG、PNG 或 WebP 图片',415);
+   let name;try{name=decodeURIComponent(req.headers['x-upload-name']||'');}catch{fail('文件名格式不正确');}
+   return json(res,await homeCarousel.upload(await body(req,40*1024*1024),name),201);
+  }
+  const carouselDelete=route.match(/^\/api\/admin\/home-carousel\/images\/([a-f0-9-]{36})$/);
+  if(carouselDelete&&method==='DELETE')return json(res,await homeCarousel.remove(carouselDelete[1],(await input(req)).revision));
   if(route==='/api/admin/storage'&&method==='GET') {
    const activeJobs=db.prepare("SELECT count(*) AS n FROM videos WHERE status IN ('uploading','queued','processing')").get().n;
    return json(res,await storageOverview(dataDir,activeJobs));
@@ -131,6 +145,7 @@ async function handle(req,res){
   if(route.startsWith('/api/images/')&&(method==='GET'||method==='HEAD')){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
    const lookup=()=>{
+    const slideImage=homeCarousel.find(iid,!!current);if(slideImage)return slideImage;
     const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();
     for(const r of rows){
      const project=JSON.parse(r.data);
