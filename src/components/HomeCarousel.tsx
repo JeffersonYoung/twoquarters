@@ -40,7 +40,7 @@ export function HomeCarousel({ english = false }: { english?: boolean }) {
   function move(step: number) { if (count > 1) { setIndex(i => (i + step + count) % count); setPaused(true); } }
   return <div className="hero-carousel" role="region" aria-roledescription="carousel" aria-label={english ? "Homepage images" : "首页图片轮播"}
     onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-    onFocusCapture={() => setPaused(true)} onTouchStart={e => { touch.current = e.touches[0].clientX; }}
+    onFocusCapture={e => { if (e.target.matches(":focus-visible")) setPaused(true); }} onTouchStart={e => { touch.current = e.touches[0].clientX; }}
     onTouchEnd={e => { if (touch.current !== null && Math.abs(e.changedTouches[0].clientX - touch.current) > 45) move(e.changedTouches[0].clientX < touch.current ? 1 : -1); touch.current = null; }}>
     {count ? <div className="hero-carousel-track" style={{ transform: `translateX(-${index * 100}%)`, transition: wrapping ? "none" : undefined }}>
       {slides.map((slide, i) => <div className="hero-carousel-slide" key={slide.id} aria-hidden={i !== index}>
