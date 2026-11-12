@@ -33,25 +33,19 @@ export function HomeCarousel({ english = false }: { english?: boolean }) {
   const slides = config?.slides || [], count = slides.length;
   const current = slides[index];
   useEffect(() => {
-    if (count < 2 || paused || hover || hidden || reduced || !loaded[current?.id]) return;
+    if (count < 2 || hover || hidden || reduced || !loaded[current?.id]) return;
     const timer = window.setTimeout(() => setIndex(i => (i + 1) % count), (config?.interval || 5) * 1000);
     return () => window.clearTimeout(timer);
-  }, [count, paused, hover, hidden, reduced, loaded, current?.id, config?.interval, index]);
-  function move(step: number) { if (count > 1) { setIndex(i => (i + step + count) % count); setPaused(true); } }
+  }, [count, hover, hidden, reduced, loaded, current?.id, config?.interval, index]);
+  function move(step: number) { if (count > 1) { setIndex(i => (i + step + count) % count); } }
   return <div className="hero-carousel" role="region" aria-roledescription="carousel" aria-label={english ? "Homepage images" : "首页图片轮播"}
     onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-    onFocusCapture={e => { if (e.target.matches(":focus-visible")) setPaused(true); }} onTouchStart={e => { touch.current = e.touches[0].clientX; }}
+    onTouchStart={e => { touch.current = e.touches[0].clientX; }}
     onTouchEnd={e => { if (touch.current !== null && Math.abs(e.changedTouches[0].clientX - touch.current) > 45) move(e.changedTouches[0].clientX < touch.current ? 1 : -1); touch.current = null; }}>
     {count ? <div className="hero-carousel-track" style={{ transform: `translateX(-${index * 100}%)`, transition: wrapping ? "none" : undefined }}>
       {slides.map((slide, i) => <div className="hero-carousel-slide" key={slide.id} aria-hidden={i !== index}>
         {(i === index || i === (index + 1) % count || i === (index + count - 1) % count) && <img {...source(slide)} {...(i === index ? highPriorityImage : {})} alt={slide.alt || (english ? `Selected photograph ${i + 1}` : `精选影像 ${i + 1}`)} loading={i === index ? "eager" : "lazy"} decoding="async" onLoad={() => setLoaded(value => ({ ...value, [slide.id]: true }))} onError={() => { setConfig(value => value ? { ...value, slides: value.slides.filter(s => s.id !== slide.id) } : value); setIndex(0); }} />}
       </div>)}
     </div> : <img {...responsiveImage("/images/automotive/hero-mclaren.jpg", [480, 960, 1600], "100vw")} {...highPriorityImage} alt={english ? "Red supercar in motion" : "行驶中的红色超级跑车"} loading="eager" decoding="async" />}
-    {count > 1 && <div className="hero-carousel-controls">
-      <button type="button" aria-label={english ? "Previous image" : "上一张"} onClick={() => move(-1)}>←</button>
-      <span aria-live={paused ? "polite" : "off"}>{String(index + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}</span>
-      <button type="button" aria-label={english ? "Next image" : "下一张"} onClick={() => move(1)}>→</button>
-      <button type="button" onClick={() => { setPaused(!paused); if (reduced) setReduced(false); }} aria-label={paused || reduced ? (english ? "Play slideshow" : "播放轮播") : (english ? "Pause slideshow" : "暂停轮播")}>{paused || reduced ? "▶" : "Ⅱ"}</button>
-    </div>}
   </div>;
 }
