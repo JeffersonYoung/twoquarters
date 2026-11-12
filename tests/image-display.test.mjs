@@ -23,7 +23,7 @@ test('all work-image surfaces use contain; only decorative home/about background
   const coverSelectors = [];
   css.walkDecls('object-fit', decl => { if (decl.value === 'cover') coverSelectors.push(decl.parent.selector); });
   assert.deepEqual(coverSelectors.sort(), ['.about-image-band img', '.hero-carousel > img', '.hero-carousel-slide img', '.home-hero > img']);
-  assert.equal(rule('.hero-carousel-slide img')['object-fit'], rule('.home-hero > img')['object-fit']);
+  assert.equal(rule('.hero-carousel-slide img')['object-fit'], 'cover');
 });
 
 test('cards and galleries adapt to source ratio without desktop or mobile ratio overrides', () => {

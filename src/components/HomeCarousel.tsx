@@ -10,7 +10,6 @@ function source(slide: HomeSlide) {
 export function HomeCarousel({ english = false }: { english?: boolean }) {
   const [config, setConfig] = useState<HomeCarouselConfig | null>(null);
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
   const [hover, setHover] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [reduced, setReduced] = useState(false);
