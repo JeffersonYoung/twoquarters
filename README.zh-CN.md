@@ -199,7 +199,7 @@ Docker 可选启用（原始 Compose 无配置文件也能运行）：
 
 ### 首页轮播管理
 
-登录后访问 `/admin/home`（项目管理页也有入口）。支持批量上传 JPEG/PNG/WebP、展示开关、上下调整顺序、删除和 3–30 秒轮播间隔。上传图片默认隐藏，修改后点击“保存设置”公开；无展示图片时保留默认首页图。首页支持自动播放及触屏滑动，不显示箭头、页码或播放控件；页面不可见、鼠标停留或系统要求减少动态效果时暂停自动播放。
+登录后访问 `/admin/home`（项目管理页也有入口）。支持批量上传 JPEG/PNG/WebP、展示开关、上下调整顺序、删除和 3–30 秒轮播间隔。上传图片默认隐藏，修改后点击“保存设置”公开；无展示图片时保留默认首页图。首页图片从左右交替由小变大汇聚到中心，约 1.9 秒完成后以原有首屏尺寸停留，按后台间隔自动循环，支持触屏滑动；两侧最多加载四张小尺寸队列图，仅提前加载下一张主图。不显示箭头、页码或播放控件；页面不可见、鼠标停留或系统要求减少动态效果时暂停自动播放，减少动态效果及单图状态直接展示静态主图。
 
 接口：公开 `GET /api/home-carousel`；管理员 `GET/PATCH /api/admin/home-carousel`、`POST /api/admin/home-carousel/images`（原始图片请求体、对应 Content-Type、URL 编码的 X-Upload-Name）、`DELETE /api/admin/home-carousel/images/:id`（JSON `{revision}`）。写入需要现有登录 Cookie、同源 Origin 和 X-CSRF-Token。PATCH 提交 `{revision, interval, slides:[{id,enabled,alt}]}` 完整有序列表；并发修改返回 409，重新读取后编辑。
 

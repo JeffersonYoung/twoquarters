@@ -2303,9 +2303,26 @@ main {
 }
 .hero-carousel { position:absolute; inset:0; touch-action:pan-y; }
 .hero-carousel > img { width:100%; height:100%; object-fit:cover; }
-.hero-carousel-track { display:flex; height:100%; transition:transform .65s cubic-bezier(.22,1,.36,1); }
-.hero-carousel-slide { flex:0 0 100%; min-width:0; height:100%; background:#101010; }
+.hero-carousel-track { position:relative; height:100%; perspective:1400px; overflow:hidden; background:#080808; }
+.hero-carousel-slide { position:absolute; inset:0; min-width:0; height:100%; background:#101010; backface-visibility:hidden; }
 .hero-carousel-slide img { display:block; width:100%; height:100%; object-fit:cover; }
+.hero-carousel-main { z-index:2; opacity:0; }
+.is-ready .hero-carousel-main { animation:hero-converge 1.9s cubic-bezier(.22,.68,.26,1) both; }
+.hero-carousel-preview { z-index:1; opacity:.6; transform:translateX(calc(var(--side) * (30% + var(--depth) * 12%))) scale(calc(.22 - var(--depth) * .09)) rotateY(calc(var(--side) * -24deg)); }
+.is-ready .hero-carousel-preview { animation:hero-queue 1.9s ease-out both; }
+.is-still .hero-carousel-main { animation:none; opacity:1; transform:none; }
+.is-still .hero-carousel-preview { display:none; }
+@keyframes hero-converge {
+  0% { opacity:0; transform:translateX(calc(var(--entry-side) * 57%)) scale(.13) rotateY(calc(var(--entry-side) * -30deg)); }
+  16% { opacity:1; }
+  55% { transform:translateX(calc(var(--entry-side) * 17%)) scale(.52) rotateY(calc(var(--entry-side) * -12deg)); }
+  100% { opacity:1; transform:translateX(0) scale(1) rotateY(0); }
+}
+@keyframes hero-queue {
+  from { opacity:0; transform:translateX(calc(var(--side) * (55% + var(--depth) * 10%))) scale(calc(.12 - var(--depth) * .03)) rotateY(calc(var(--side) * -30deg)); }
+  30% { opacity:.8; }
+  to { opacity:.6; transform:translateX(calc(var(--side) * (30% + var(--depth) * 12%))) scale(calc(.22 - var(--depth) * .09)) rotateY(calc(var(--side) * -24deg)); }
+}
 .hero-shade { pointer-events:none; }
 .carousel-admin { min-height:100svh; background:#101010; color:#eee; }
 .carousel-editor { max-width:1440px; padding:110px 28px 60px; margin:auto; }
@@ -2336,4 +2353,7 @@ main {
  .carousel-admin .admin-topbar > div { gap:12px; }
  .carousel-admin .admin-topbar a { display:inline; font-size:12px; }
 }
-@media(prefers-reduced-motion:reduce) { .hero-carousel-track { transition:none; } }
+@media(prefers-reduced-motion:reduce) {
+ .is-ready .hero-carousel-main { animation:none; opacity:1; transform:none; }
+ .hero-carousel-preview { display:none; }
+}
