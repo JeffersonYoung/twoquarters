@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { highPriorityImage, responsiveImage } from "../lib/images";
-import { carouselFrame, slideIndex } from "../lib/carousel-motion";
+import { apertureOpen, carouselFrame, slideIndex } from "../lib/carousel-motion";
 import type { HomeCarouselConfig, HomeSlide } from "../lib/projects";
 
 function source(slide: HomeSlide) {
@@ -10,12 +10,12 @@ function source(slide: HomeSlide) {
 
 export function HomeCarousel({ english = false }: { english?: boolean }) {
   const [config, setConfig] = useState<HomeCarouselConfig | null>(null);
-  const [index, setIndex] = useState(0);
-  const [hover, setHover] = useState(false);
+  const index = 0;
   const [hidden, setHidden] = useState(false);
   const [reduced, setReduced] = useState(false);
-  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
-  const touch = useRef<number | null>(null);
+
+  const track = useRef<HTMLDivElement>(null);
+  const aperture = useRef<HTMLDivElement>(null);
   const position = useRef(0);
   const cards = useRef(new Map<number, HTMLDivElement>());
   useEffect(() => {
@@ -30,50 +30,47 @@ export function HomeCarousel({ english = false }: { english?: boolean }) {
     return () => { controller.abort(); media.removeEventListener("change", motion); document.removeEventListener("visibilitychange", visibility); };
   }, []);
   const slides = config?.slides || [], count = slides.length;
-  const current = slides[slideIndex(index, count)];
-  const next = slides[slideIndex(index + 1, count)];
+
   useEffect(() => {
-    if (count < 2 || hover || hidden || reduced || !loaded[current?.id] || !loaded[next?.id]) return;
+    if (count < 2 || hidden || reduced) return;
     let frame = 0, last = 0;
     const render = (now: number) => {
-      if (last) position.current += Math.min(now - last, 64) / ((config?.interval || 5) * 1000);
+      if (last) position.current += Math.min(now - last, 64);
       last = now;
-      cards.current.forEach((card, sequence) => {
-        const value = carouselFrame(sequence, position.current);
-        card.style.transform = value.transform;
-        card.style.opacity = String(value.opacity);
-        card.style.zIndex = String(value.zIndex);
-      });
-      const arrival = Math.floor(position.current);
-      if (arrival !== index) setIndex(arrival);
+      const stage = track.current, opening = aperture.current;
+      if (stage && opening) {
+        // Match the reference speed at the minimum (3s) setting; larger settings slow playback.
+        const elapsed = position.current * 3 / (config?.interval || 3);
+        opening.style.transform = `translate(-50%,-50%) scaleX(${apertureOpen(elapsed)})`;
+        const baseWidth = cards.current.get(0)?.offsetWidth || 180;
+        cards.current.forEach((card, sequence) => {
+          const value = carouselFrame(Math.floor(sequence / 2), sequence % 2, elapsed, stage.clientWidth, window.innerHeight, baseWidth, opening.offsetHeight);
+          Object.assign(card.style, { transform: value.transform, opacity: String(value.opacity), zIndex: String(value.zIndex) });
+        });
+      }
       frame = requestAnimationFrame(render);
     };
     frame = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame);
-  }, [count, hover, hidden, reduced, loaded, current?.id, next?.id, config?.interval, index]);
-  function move(step: number) {
-    if (count > 1) { position.current = index + step; setIndex(index + step); }
-  }
+  }, [count, hidden, reduced, config?.interval]);
   function failed(id: string) {
     setConfig(value => value ? { ...value, slides: value.slides.filter(s => s.id !== id) } : value);
-    position.current = 0; setIndex(0);
+    position.current = 0;
   }
   const still = count === 1 || reduced;
-  const sequences = still ? [index] : Array.from({ length: 9 }, (_, offset) => index + offset - 1);
-  return <div className="hero-carousel" role="region" aria-roledescription="carousel" aria-label={english ? "Homepage images" : "首页图片轮播"}
-    onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-    onTouchStart={e => { touch.current = e.touches[0].clientX; }}
-    onTouchEnd={e => { if (touch.current !== null && Math.abs(e.changedTouches[0].clientX - touch.current) > 45) move(e.changedTouches[0].clientX < touch.current ? 1 : -1); touch.current = null; }}>
-    {count ? <div className={`hero-carousel-track${still ? " is-still" : ""}`}>
+  const sequences = still ? [index] : Array.from({ length: 64 }, (_, offset) => offset);
+  return <div className="hero-carousel" role="region" aria-roledescription="carousel" aria-label={english ? "Homepage images" : "首页图片轮播"}>
+    {count ? <div ref={track} className={`hero-carousel-track${still ? " is-still" : ""}`}>
+      {!still && <div ref={aperture} className="hero-carousel-aperture" aria-hidden="true" />}
       {sequences.map(sequence => {
         const i = slideIndex(sequence, count), slide = slides[i];
-        const full = sequence <= index + 1;
+
         return <div className="hero-carousel-slide" key={`${sequence}-${slide.id}`} ref={node => {
           if (node) cards.current.set(sequence, node); else cards.current.delete(sequence);
-        }} aria-hidden={sequence !== index} style={still ? { transform: "none", opacity: 1 } : carouselFrame(sequence, position.current)}>
-          <img {...(full ? source(slide) : { src: source(slide).src })} {...(sequence === index ? highPriorityImage : {})}
+        }} aria-hidden={sequence !== index} style={still ? { transform: "none", opacity: 1 } : { opacity: 0, transformOrigin: sequence % 2 === 0 ? "100% 50%" : "0% 50%" }}>
+          <img {...source(slide)} {...(sequence === index ? highPriorityImage : {})}
             alt={sequence === index ? slide.alt || (english ? `Selected photograph ${i + 1}` : `精选影像 ${i + 1}`) : ""}
-            decoding="async" onLoad={() => { if (full) setLoaded(value => value[slide.id] ? value : { ...value, [slide.id]: true }); }} onError={() => failed(slide.id)} />
+            decoding="async" onError={() => failed(slide.id)} />
         </div>;
       })}
     </div> : <img {...responsiveImage("/images/automotive/hero-mclaren.jpg", [480, 960, 1600], "100vw")} {...highPriorityImage} alt={english ? "Red supercar in motion" : "行驶中的红色超级跑车"} loading="eager" decoding="async" />}
