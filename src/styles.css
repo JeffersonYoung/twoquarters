@@ -2305,7 +2305,7 @@ main {
 .hero-carousel > img { width:100%; height:100%; object-fit:cover; }
 .hero-carousel-track { position:absolute; top:21.5%; left:0; width:100%; height:55%; perspective:850px; perspective-origin:50% 50%; pointer-events:none; }
 .hero-carousel-aperture { position:absolute; top:50%; left:50%; z-index:5; width:clamp(210px,15vw,288px); height:clamp(54px,5.6vw,108px); border-radius:8px; background:transparent; transform:translate(-50%,-50%) scaleX(0); }
-.hero-carousel-slide { position:absolute; top:50%; left:50%; width:clamp(180px,12.5vw,240px); aspect-ratio:4/3; overflow:hidden; border-radius:8px; background:#101010; transform-style:preserve-3d; backface-visibility:hidden; will-change:transform,opacity; }
+.hero-carousel-slide { position:absolute; top:50%; left:50%; width:min(72vw,106.666667vh); aspect-ratio:4/3; overflow:hidden; border-radius:8px; background:#101010; transform-style:preserve-3d; backface-visibility:hidden; will-change:transform,opacity; }
 .hero-carousel-slide img { display:block; width:100%; height:100%; object-fit:cover; }
 .hero-carousel-track.is-still { inset:0; height:100%; }
 .is-still .hero-carousel-slide { inset:0; width:100%; height:100%; aspect-ratio:auto; border-radius:0; }
