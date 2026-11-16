@@ -12,18 +12,21 @@ test('reference opening and initial fill preserve timing',()=>{
  assert.ok(Math.abs(getStreamPosition(imageStart+1000)-6)<1e-10);
  assert.ok(Math.abs(getStreamPosition(imageStart+2200)-7)<1e-10);
 });
-test('paired cards move outward symmetrically and grow, then wrap seamlessly',()=>{
+test('both sides approach the center and grow, then fade and repeat',()=>{
  const x=f=>Number(f.transform.match(/ \+ (-?[\d.]+)px/)[1]);
  const scale=f=>Number(f.transform.match(/scale\(([\d.]+)/)[1]);
- let previous=0, previousScale=0;
- for(let t=imageStart;t<imageStart+2200;t+=10){
-  const left=frame(0,0,t),right=frame(0,1,t);
-  assert.ok(Math.abs(x(left)+x(right))<1e-8);
-  assert.ok(Math.abs(x(left))>=previous-1e-8); previous=Math.abs(x(left));
-  assert.ok(scale(left)>=previousScale-1e-8); previousScale=scale(left);
-  assert.equal(left.opacity,right.opacity);
+ for(const side of [0,1]) {
+  let previous=Infinity, previousScale=0;
+  for(let t=imageStart;t<imageStart+3000;t+=10){
+   const card=frame(0,side,t);
+   assert.ok(Math.abs(x(card))<=previous+1e-8);previous=Math.abs(x(card));
+   assert.ok(scale(card)>=previousScale-1e-8);previousScale=scale(card);
+  }
+  const t=imageStart+1600+side*600;
+  assert.equal(x(frame(0,side,t)),0);
+  assert.equal(frame(0,side,imageStart+4000).opacity,0);
+  const a=frame(0,side,t),b=frame(0,side,t+32/(5/6)*1000);
+  assert.equal(a.transform,b.transform); assert.ok(Math.abs(a.opacity-b.opacity)<1e-10);
  }
- const t=imageStart+2200;
- assert.deepEqual(frame(0,0,t),frame(0,0,t+32/(5/6)*1000));
  assert.deepEqual([0,35,36,-1].map(i=>slideIndex(i,36)),[0,35,0,35]);
 });

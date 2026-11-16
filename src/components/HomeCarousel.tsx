@@ -67,7 +67,7 @@ export function HomeCarousel({ english = false }: { english?: boolean }) {
 
         return <div className="hero-carousel-slide" key={`${sequence}-${slide.id}`} ref={node => {
           if (node) cards.current.set(sequence, node); else cards.current.delete(sequence);
-        }} aria-hidden={sequence !== index} style={still ? { transform: "none", opacity: 1 } : { opacity: 0, transformOrigin: sequence % 2 === 0 ? "100% 50%" : "0% 50%" }}>
+        }} aria-hidden={sequence !== index} style={still ? { transform: "none", opacity: 1 } : { opacity: 0, transformOrigin: "50% 50%" }}>
           <img {...source(slide)} {...(sequence === index ? highPriorityImage : {})}
             alt={sequence === index ? slide.alt || (english ? `Selected photograph ${i + 1}` : `精选影像 ${i + 1}`) : ""}
             decoding="async" onError={() => failed(slide.id)} />
