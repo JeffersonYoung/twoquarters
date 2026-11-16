@@ -39,8 +39,10 @@ export function carouselFrame(pairIndex: number, sideIndex: number, elapsed: num
   const direction=sideIndex===0?-1:1;
   const x=direction*width*.62*(1-eased);
   const finalWidth=Math.min(width*.72,viewportHeight*.8*4/3);
-  const startWidth=Math.min(apertureHeight*4/3,finalWidth*.15);
-  const scale=(startWidth+(finalWidth-startWidth)*eased)/baseCardWidth;
+  const startWidth=Math.min(apertureHeight/3,finalWidth*.04);
+  // Keep edge cards small; reserve most growth for the approach to the center.
+  const growth=eased*eased;
+  const scale=(startWidth+(finalWidth-startWidth)*growth)/baseCardWidth;
   const rotation=-direction*40*(1-eased);
   const opacity=elapsed<IMAGE_START || age<0 ? 0 : clamp(age/.35)*(1-clamp((age-6.15)/.65));
   return {transform:`translate3d(calc(-50% + ${x}px),-50%,0) rotateY(${rotation}deg) scale(${scale})`,opacity,zIndex:20+Math.round(Math.min(age,6)*10)};
