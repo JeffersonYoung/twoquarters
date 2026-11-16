@@ -80,7 +80,7 @@ export function getStreamPosition(elapsed: number) {
 
 
 export function carouselFrame(pairIndex: number, sideIndex: number, elapsed: number, width: number, viewportHeight: number, baseCardWidth: number, apertureHeight: number) {
-const baseCardHeight=baseCardWidth*4/3; const outerScale=viewportHeight*.8/baseCardHeight; const centerScaleRatio=apertureHeight/(baseCardHeight*outerScale); const scaleRatios=[centerScaleRatio,...SLOT_SCALE_RATIO.slice(1)]; const prePushDistance=baseCardWidth*centerScaleRatio*outerScale; const streamPosition=getStreamPosition(elapsed); const imagesStarted=elapsed>=IMAGE_START;
+const baseCardHeight=baseCardWidth*3/4; const outerScale=viewportHeight*.8/baseCardHeight; const centerScaleRatio=apertureHeight/(baseCardHeight*outerScale); const scaleRatios=[centerScaleRatio,...SLOT_SCALE_RATIO.slice(1)]; const prePushDistance=baseCardWidth*centerScaleRatio*outerScale; const streamPosition=getStreamPosition(elapsed); const imagesStarted=elapsed>=IMAGE_START;
     const rawStreamAge = streamPosition - pairIndex;
     const streamAge =
       rawStreamAge >= 0 ? rawStreamAge % STREAM_PAIR_COUNT : rawStreamAge;
