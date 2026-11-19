@@ -27,7 +27,7 @@ Rollback: restore the previous ECS CDN origin and its Host/SNI settings first; t
 
 ## Videos
 
-Extend `TwoquartersImageStorageObjects` only with the same GetObject/PutObject/DeleteObject actions on this bucket's `api/videos/*` prefix. Enable CDN `range` with `enable=on`; keep private OSS authorization and remote authentication (`all`, reject on failure/timeout) enabled. OSS supplies stable ETag, length and Range/206 responses; objects advertise shared caching for 86400 seconds and browser revalidation.
+Extend `TwoquartersImageStorageObjects` only with the same GetObject/PutObject/DeleteObject actions on this bucket's `api/videos/*` prefix. The separate CDN role `AliyunCDNAccessingPrivateOSSRole` also needs GetObject on that prefix in its `TwoquartersCDNReadOriginals` policy; granting only the ECS role leaves CDN origin fetches denied. Enable CDN `range` with `enable=on`; keep private OSS authorization and remote authentication (`all`, reject on failure/timeout) enabled. OSS supplies stable ETag, length and Range/206 responses; objects advertise shared caching for 86400 seconds and browser revalidation.
 
 New processed MP4/WebM files are uploaded using a file path with streaming MD5/SHA-256 checks, then HEAD-verified before the row becomes ready. UUID objects are immutable. Admin previews remain authenticated same-origin requests. Deleting a row revokes access before best-effort private object removal. Failed cleanup can leave a private orphan but cannot expose it through CDN.
 
