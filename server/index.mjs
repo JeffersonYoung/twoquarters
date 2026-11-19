@@ -5,6 +5,7 @@ import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVide
 import sharp from 'sharp';
 import { IMAGE_WIDTHS, imageVariant, prepareImageVariants, deleteImageFiles, stopImageQueue } from './images.mjs';
 import { putOriginal, deleteOriginal, publishedOriginal } from './oss.mjs';
+import { publishedVideo } from './video-oss.mjs';
 import { initializeProjectTimes, validTime } from './project-times.mjs';
 import { createHomeCarousel } from './home-carousel.mjs';
 import { createHash } from 'node:crypto';
@@ -74,11 +75,11 @@ async function removeOriginal(id) {
 }
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
- res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.twoquarters.com.cn blob: data:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.twoquarters.com.cn blob: data:; media-src 'self' https://img.twoquarters.com.cn; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
  // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
  if(route==='/api/cdn-auth') {
-  const allowed=method==='GET' && (publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCarousel.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']));
+  const allowed=method==='GET' && (publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||publishedVideo(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCarousel.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']));
   res.writeHead(allowed?200:403,{'Content-Length':'0'});return res.end();
  }
  const imageCdn=req.headers['x-twoquarters-image-cdn']==='1';

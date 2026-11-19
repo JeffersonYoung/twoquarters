@@ -398,6 +398,17 @@ test('watch selection only admits ready canonical media from the supplied public
   assert.deepEqual(helper.playableVideos({ ...project, videos: undefined }), []);
 });
 
+test('public player uses only the server-approved CDN URL for the selected video', () => {
+  const helper = loadSource('lib/videos.ts');
+  const video = { ...videos[0], cdnSrc: `https://img.twoquarters.com.cn/api/videos/${videos[0].id}` };
+  assert.equal(helper.videoSource(video), video.cdnSrc);
+  for (const cdnSrc of ['https://evil.invalid/video', video.cdnSrc+'?x=1', `https://img.twoquarters.com.cn/api/videos/${videos[1].id}`, undefined]) {
+    assert.equal(helper.videoSource({ ...video, cdnSrc }), video.src);
+  }
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, videos: [video] } });
+  assert.ok(render(ProjectPage).includes(`src="${video.cdnSrc}"`));
+});
+
 test('video-category projects without playable media never fall back to ordinary images', () => {
   for (const candidates of [[], undefined, ...['uploading', 'queued', 'processing', 'failed'].map(status => [{ ...videos[0], status }])]) {
     const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture: { ...watchProject, category: 'video', videos: candidates } });

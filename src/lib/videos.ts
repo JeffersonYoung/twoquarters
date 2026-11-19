@@ -1,5 +1,10 @@
 import type { Project, ProjectVideo } from "../data";
 
+export function videoSource(video: ProjectVideo) {
+  const expected = `https://img.twoquarters.com.cn/api/videos/${video.id}`;
+  return video.cdnSrc === expected ? expected : video.src;
+}
+
 // Selection is only an ID lookup in this published project's API response. Never
 // turn a query string into a media URL or fetch another project's video by ID.
 export function playableVideos(project: Project): ProjectVideo[] {

@@ -5,6 +5,7 @@ import { open, rename, unlink, stat, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { db, dataDir } from './store.mjs';
+import { putVideo, deleteVideoObject, videoCdnEnabled } from './video-oss.mjs';
 
 import { MAX_VIDEO_BYTES, VIDEO_DISK_RESERVE } from './storage.mjs';
 export { MAX_VIDEO_BYTES } from './storage.mjs';
@@ -36,6 +37,7 @@ export function projectVideos(p, admin = false) {
  const rows = db.prepare('SELECT * FROM videos WHERE project_id=? ORDER BY created,id').all(p.id);
  return { ...p, videos: rows.filter(v => admin || v.status === 'ready').map(v => ({
   id: v.id, src: '/api/videos/' + v.id, name: v.name, status: v.status,
+  ...(!admin && p.published && v.status === 'ready' && videoCdnEnabled ? { cdnSrc: 'https://img.twoquarters.com.cn/api/videos/' + v.id } : {}),
   contentType: v.output_type, width: v.width, height: v.height, duration: v.duration,
   ...(admin ? { error: v.error, sourceBytes: v.source_bytes, outputBytes: v.output_bytes } : {}),
  })) };
@@ -237,10 +239,12 @@ async function processQueue() {
     if (copy) await validateCopy(output);
     if (!find(v.id)) continue;
     await rename(file(v.id,'partial'),file(v.id,suffix));
+    await putVideo(v.id,file(v.id,suffix),outputType);
     if (!find(v.id)) { await remove(file(v.id,suffix)); continue; }
     await remove(file(v.id,'source'));
     db.prepare("UPDATE videos SET status='ready',output_bytes=?,width=?,height=?,duration=?,output_type=?,error=NULL WHERE id=?").run(size,stream.width,stream.height,output.duration,outputType,v.id);
    } catch (error) {
+    await deleteVideoObject(v.id).catch(() => console.error('OSS video cleanup failed:',v.id));
     await Promise.all(['source','partial','mp4','webm'].map(s=>remove(file(v.id,s))));
     if (!stopping) db.prepare("UPDATE videos SET status='failed',error=? WHERE id=?").run(v.compression_mode === 'browser'
      ? '浏览器压缩结果不符合要求或文件损坏；临时文件已清理。请重新压缩，或选择服务器压缩后重新上传。'
@@ -250,7 +254,7 @@ async function processQueue() {
     activeId = undefined;
     await remove(file(v.id,'partial'));
     await remove(file(v.id,'source'));
-    if (!find(v.id)) { await remove(file(v.id,'source')); await remove(file(v.id,'mp4')); await remove(file(v.id,'webm')); }
+    if (!find(v.id)) { await remove(file(v.id,'source')); await remove(file(v.id,'mp4')); await remove(file(v.id,'webm')); await deleteVideoObject(v.id).catch(() => console.error('OSS video cleanup failed:',v.id)); }
    }
   }
  } finally { running = false; }
@@ -309,6 +313,8 @@ export async function deleteVideo(projectId, id) {
  if (activeId === id) activeProcess?.kill('SIGKILL');
  // A running process may still hold a file handle; the worker performs a final cleanup too.
  await Promise.all(['source','mp4','webm','partial'].map(s=>remove(file(id,s))));
+ // Publication authorization is revoked in SQLite before removing private objects.
+ await deleteVideoObject(id).catch(() => console.error('OSS video cleanup failed:',id));
 }
 export async function deleteProjectVideos(projectId) {
  for (const v of db.prepare('SELECT id FROM videos WHERE project_id=?').all(projectId)) await deleteVideo(projectId,v.id);

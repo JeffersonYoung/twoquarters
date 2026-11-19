@@ -2,7 +2,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { useState } from "react";
 import type { Project, ProjectVideo } from "../data";
 import { imageVariant } from "../lib/images";
-import { selectedVideo, videoLink } from "../lib/videos";
+import { selectedVideo, videoLink, videoSource } from "../lib/videos";
 import { Link, useLocation } from "../router";
 
 function Player({ video, poster }: { video: ProjectVideo; poster: string }) {
@@ -11,7 +11,7 @@ function Player({ video, poster }: { video: ProjectVideo; poster: string }) {
     ? `${video.width} / ${video.height}` : "16 / 9";
   return (
     <>
-      <video className="watch-player" src={video.src} poster={poster}
+      <video className="watch-player" src={videoSource(video)} poster={poster}
         controls playsInline preload="metadata" aria-label={video.name}
         style={{ aspectRatio: ratio }} onError={() => setFailed(true)} onLoadedData={() => setFailed(false)}>
         你的浏览器不支持视频播放。

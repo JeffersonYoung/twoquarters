@@ -12,6 +12,7 @@ export type ProjectImage = {
 export type ProjectVideo = {
   id: string;
   src: string;
+  cdnSrc?: string;
   name: string;
   status: "uploading" | "queued" | "processing" | "ready" | "failed";
   error?: string;
