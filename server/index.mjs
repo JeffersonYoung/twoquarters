@@ -34,11 +34,12 @@ db.exec(`
  WHERE json_type(data,'$.featured') IS NULL
 `);
 // Remove legacy image captions from both stored copies, keeping gallery order and project credits.
+// Re-tag the scalar subquery as JSON so SQLite stores an array, not a JSON string.
 db.exec(`
- UPDATE projects SET data=json_remove(json_set(data, '$.images', (
+ UPDATE projects SET data=json_remove(json_set(data, '$.images', json((
    SELECT json_group_array(json_remove(image.value,'$.alt','$.credit') ORDER BY image.key)
    FROM json_each(projects.data,'$.images') AS image
- )), '$.cover.alt', '$.cover.credit')
+  ))), '$.cover.alt', '$.cover.credit')
  WHERE json_type(data,'$.cover.alt') IS NOT NULL OR json_type(data,'$.cover.credit') IS NOT NULL
  OR EXISTS (SELECT 1 FROM json_each(data,'$.images') AS image
             WHERE json_type(image.value,'$.alt') IS NOT NULL OR json_type(image.value,'$.credit') IS NOT NULL)
