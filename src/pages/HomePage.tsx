@@ -27,7 +27,6 @@ export function HomePage({ english = false }: { english?: boolean }) {
           <span>HK · DE · CN</span>
         </div>
         <div className="hero-title">
-          <p>{english ? "Photography / CGI / Production" : "摄影 / CGI / 整合制作"}</p>
           <h1>TWO<br />QUARTERS</h1>
         </div>
         <a className="hero-scroll" href={featured.length ? "#work" : localizedHref("/works", english)}>
