@@ -49,7 +49,7 @@ export function Header() {
       <button
         className="menu-button"
         type="button"
-        aria-label={open ? "关闭菜单" : "打开菜单"}
+        aria-label={isEnglish ? (open ? "Close menu" : "Open menu") : (open ? "关闭菜单" : "打开菜单")}
         aria-expanded={open}
         onClick={() => setOpenPath(open ? null : location.pathname)}
       >

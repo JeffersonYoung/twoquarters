@@ -1,6 +1,7 @@
 import { ProjectCard } from "../components/ProjectCard";
 import { Reveal } from "../components/Reveal";
-import { categoryLabels, selectableCategories, type ProjectCategory } from "../data";
+import { categoryLabels, categoryLabelsEn, selectableCategories, type ProjectCategory } from "../data";
+import { isEnglishLocation } from "../lib/language";
 import { useProjects } from "../ProjectsContext";
 import { useLocation } from "../router";
 
@@ -12,6 +13,7 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 export function WorksPage() {
+  const english = isEnglishLocation(useLocation());
   const { projects } = useProjects();
   const { search, hash = "", navigate } = useLocation();
   const category = new URLSearchParams(search).get("category");
@@ -34,12 +36,12 @@ export function WorksPage() {
     <main className="page-main">
       <section className="page-intro works-intro">
         <span>Selected archive · 2025—2026</span>
-        <h1>作品<br />WORK</h1>
-        <p>从商业摄影到数字影像，每个项目都从品牌问题出发，以清晰、完整的视觉语言回应。</p>
+        <h1>{!english && <>作品<br /></>}WORK</h1>
+        <p>{english ? "From commercial photography to digital imagery, every project starts with a brand challenge and responds with a clear, complete visual language." : "从商业摄影到数字影像，每个项目都从品牌问题出发，以清晰、完整的视觉语言回应。"}</p>
       </section>
 
       <section className="works-browser">
-        <div className="filter-tabs" role="tablist" aria-label="作品分类">
+        <div className="filter-tabs" role="tablist" aria-label={english ? "Work categories" : "作品分类"}>
           {filters.map((item) => (
             <button
               key={item.value}
@@ -48,7 +50,7 @@ export function WorksPage() {
               aria-selected={filter === item.value}
               onClick={() => setFilter(item.value)}
             >
-              {item.label}
+              {english ? (item.value === "all" ? "All" : categoryLabelsEn[item.value]) : item.label}
               <span>
                 {item.value === "all" ? projects.length : projects.filter((project) => project.category === item.value).length}
               </span>

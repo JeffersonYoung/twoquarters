@@ -9,6 +9,7 @@ import { HomePage } from "./pages/HomePage";
 import { ProjectPage } from "./pages/ProjectPage";
 import { WorksPage } from "./pages/WorksPage";
 import { Navigate, useLocation } from "./router";
+import { isEnglishLocation } from "./lib/language";
 
 function ScrollManager() {
   const location = useLocation();
@@ -27,6 +28,7 @@ function ScrollManager() {
 export function App() {
   const location = useLocation();
   const { error, refresh } = useProjects();
+  const english = isEnglishLocation(location);
 
   if (location.pathname.startsWith("/admin")) {
     if (!adminTransportAllowed()) return <main className="portfolio-error" role="alert">请使用已配置的 HTTPS 管理地址登录。公开页面仍可通过 HTTP 浏览。</main>;
@@ -34,7 +36,7 @@ export function App() {
   }
 
   let page: React.ReactNode;
-  if (location.pathname === "/") page = <HomePage />;
+  if (location.pathname === "/") page = <HomePage english={english} />;
   else if (location.pathname === "/works") page = <WorksPage />;
   else if (/^\/works\/[^/]+$/.test(location.pathname)) page = <ProjectPage key={location.pathname} />;
   else if (location.pathname === "/about") page = <AboutPage />;
@@ -45,7 +47,7 @@ export function App() {
     <div className="public-site">
       <ScrollManager />
       <Header />
-      {error && <div role="alert" className="portfolio-error">{error} <button onClick={() => void refresh()}>重试</button></div>}
+      {error && <div role="alert" className="portfolio-error">{english ? "Unable to load projects. Please try again." : error} <button onClick={() => void refresh()}>{english ? "Retry" : "重试"}</button></div>}
       {page}
       <Footer />
     </div>

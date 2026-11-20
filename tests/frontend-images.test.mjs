@@ -76,6 +76,27 @@ function loadSource(entry, { admin = false, fixture = project, projects = [fixtu
 }
 
 const helper = loadSource('lib/images.ts');
+
+test('English public pages translate headings, filters and controls, and use English project titles', () => {
+  const fixture = { ...project, title: '中文项目', titleEn: 'English project' };
+  for (const [entry, name] of [
+    ['pages/WorksPage.tsx', 'WorksPage'],
+    ['pages/AboutPage.tsx', 'AboutPage'],
+    ['pages/ProjectPage.tsx', 'ProjectPage'],
+    ['components/ProjectWatch.tsx', 'ProjectWatch'],
+    ['components/Lightbox.tsx', 'Lightbox'],
+  ]) {
+    const Component = loadSource(entry, { fixture, search: '?lang=en&category=automotive' })[name];
+    const html = renderToStaticMarkup(React.createElement(Component, {
+      project: fixture, videos: [], images, index: 0, onClose() {}, onChange() {},
+    }));
+    assert.doesNotMatch(html, /[\p{Script=Han}]/u, entry);
+  }
+  const { WorksPage } = loadSource('pages/WorksPage.tsx', { fixture });
+  const chinese = renderToStaticMarkup(React.createElement(WorksPage));
+  assert.match(chinese, /作品分类/);
+  assert.match(chinese, /中文项目/);
+});
 const imgTags = markup => [...markup.matchAll(/<img\b[^>]*>/g)].map(match => match[0]);
 const attr = (tag, name) => tag.match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`, 'i'))?.[1];
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));

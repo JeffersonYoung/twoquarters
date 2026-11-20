@@ -1,13 +1,15 @@
 import { ArrowUpRight } from "lucide-react";
-import { categoryLabels, type Project } from "../data";
+import { categoryLabels, categoryLabelsEn, type Project } from "../data";
 import { projectCardSizes, responsiveImage } from "../lib/images";
-import { Link } from "../router";
+import { Link, useLocation } from "../router";
+import { isEnglishLocation } from "../lib/language";
 
 export function ProjectCard({ project, index = 0, loading = index > 1 ? "lazy" : "eager" }: {
   project: Project;
   index?: number;
   loading?: "lazy" | "eager";
 }) {
+  const english = isEnglishLocation(useLocation());
   return (
     <article className={`project-card project-card-${(index % 4) + 1}`}>
       <Link to={`/works/${project.slug}`}>
@@ -17,11 +19,11 @@ export function ProjectCard({ project, index = 0, loading = index > 1 ? "lazy" :
         </figure>
         <div className="project-card-meta">
           <div>
-            <h3>{project.title}</h3>
-            <p>{project.titleEn}</p>
+            <h3>{english ? project.titleEn || project.title : project.title}</h3>
+            {!english && <p>{project.titleEn}</p>}
           </div>
           <div>
-            <span>{categoryLabels[project.category]}</span>
+            <span>{(english ? categoryLabelsEn : categoryLabels)[project.category]}</span>
             <span>{project.year}</span>
           </div>
         </div>

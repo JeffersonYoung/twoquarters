@@ -4,6 +4,16 @@ import { isEnglishLocation } from "../lib/language";
 
 type CreditRow = [string, string | undefined];
 
+const englishCreditLabels: Record<string, string> = {
+  "品牌": "Brand", "代理商": "Agency", "制作公司": "Production Company",
+  "摄影师": "Photographer", "摄影指导": "Director of Photography", "后期团队": "Post-production",
+  "客户": "Client", "Creative创意": "Creative", "监制": "Executive Producer",
+  "制片": "Producer", "总导演": "Director", "导演": "Director", "摄影大助": "First Camera Assistant",
+  "航拍": "Aerial Cinematography", "造型": "Styling", "女模": "Female Model",
+  "男模": "Male Model", "童模": "Child Model", "调色": "Color Grading",
+  "剪辑": "Editing", "声音设计/混音": "Sound Design / Mixing",
+};
+
 function creditRows(value: string | undefined, fallback: string): CreditRow[] {
   return (value || "").split(/[\r\n；]+/).map((line): CreditRow => {
     const text = line.trim();
@@ -61,7 +71,7 @@ export function ProjectMetadata({ project, includeCredits = false }: { project: 
       <dl>
         {rows.filter(([, value]) => value?.trim()).map(([label, value]) => (
           <div key={`${label}:${value}`}>
-            <dt>{label}{english ? ":" : "："}</dt>
+            <dt>{english ? englishCreditLabels[label] || label : label}{english ? ":" : "："}</dt>
             <dd>{value?.trim()}</dd>
           </div>
         ))}

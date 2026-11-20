@@ -7,9 +7,11 @@ import { playableVideos } from "../lib/videos";
 import { Reveal } from "../components/Reveal";
 import { highPriorityImage, projectGallerySizes, responsiveImage } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
-import { Link, Navigate, useParams } from "../router";
+import { Link, Navigate, useParams, useLocation } from "../router";
+import { isEnglishLocation, localizedHref } from "../lib/language";
 
 export function ProjectPage() {
+  const english = isEnglishLocation(useLocation());
   const { projects, loading } = useProjects();
   const { slug } = useParams();
   const projectIndex = projects.findIndex((item) => item.slug === slug);
@@ -17,8 +19,8 @@ export function ProjectPage() {
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const changeLightbox = useCallback((index: number) => setLightboxIndex(index), []);
 
-  if (loading) return <main className="project-loading">正在加载项目</main>;
-  if (projectIndex < 0) return <Navigate to="/works" replace />;
+  if (loading) return <main className="project-loading">{english ? "Loading project" : "正在加载项目"}</main>;
+  if (projectIndex < 0) return <Navigate to={localizedHref("/works", english)} replace />;
 
   const project = projects[projectIndex];
   const videos = playableVideos(project);
@@ -31,11 +33,11 @@ export function ProjectPage() {
       {isVideoProject ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
         <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt="" width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
-        <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> 所有作品</Link>
+        <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> {english ? "All work" : "所有作品"}</Link>
         <div className="project-hero-title">
           <span>{String(projectIndex + 1).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}</span>
-          <h1>{project.title}</h1>
-          <p>{project.titleEn}</p>
+          <h1>{english ? project.titleEn || project.title : project.title}</h1>
+          {!english && <p>{project.titleEn}</p>}
         </div>
       </section>}
 
@@ -52,7 +54,7 @@ export function ProjectPage() {
       {!isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
           <Reveal key={image.src} className={`gallery-shot gallery-shot-${(index % 5) + 1}`}>
-            <button type="button" onClick={() => setLightboxIndex(index)} aria-label={`查看第 ${index + 1} 张大图`}>
+            <button type="button" onClick={() => setLightboxIndex(index)} aria-label={english ? `View image ${index + 1}` : `查看第 ${index + 1} 张大图`}>
               <img {...responsiveImage(image.src, [960, 1600], projectGallerySizes(index), image.width)} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" />
               <span className="shot-expand"><Maximize2 aria-hidden="true" /></span>
             </button>
@@ -65,13 +67,13 @@ export function ProjectPage() {
         <p>{project.credits}</p>
       </section>}
 
-      <nav className="project-pagination" aria-label="项目导航">
+      <nav className="project-pagination" aria-label={english ? "Project navigation" : "项目导航"}>
         <Link to={`/works/${previous.slug}`}>
           <ArrowLeft aria-hidden="true" />
-          <span>上一个项目<strong>{previous.title}</strong></span>
+          <span>{english ? "Previous project" : "上一个项目"}<strong>{english ? previous.titleEn || previous.title : previous.title}</strong></span>
         </Link>
         <Link to={`/works/${next.slug}`}>
-          <span>下一个项目<strong>{next.title}</strong></span>
+          <span>{english ? "Next project" : "下一个项目"}<strong>{english ? next.titleEn || next.title : next.title}</strong></span>
           <ArrowRight aria-hidden="true" />
         </Link>
       </nav>

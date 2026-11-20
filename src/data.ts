@@ -57,3 +57,11 @@ export const categoryLabels: Record<ProjectCategory, string> = {
   video: "视频",
   bts: "幕后影像",
 };
+
+export const categoryLabelsEn: Record<ProjectCategory, string> = {
+  automotive: "Automotive",
+  "cg-ai": "CG&AI",
+  fmcg: "Consumer Goods",
+  video: "Video",
+  bts: "Behind the Scenes",
+};

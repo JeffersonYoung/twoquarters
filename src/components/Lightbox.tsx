@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect } from "react";
 import type { ProjectImage } from "../data";
+import { useLocation } from "../router";
+import { isEnglishLocation } from "../lib/language";
 
 export function Lightbox({
   images,
@@ -13,6 +15,7 @@ export function Lightbox({
   onChange: (index: number) => void;
   onClose: () => void;
 }) {
+  const english = isEnglishLocation(useLocation());
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -37,31 +40,31 @@ export function Lightbox({
     : original;
 
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" aria-label="作品大图">
-      <button className="lightbox-backdrop" type="button" aria-label="关闭大图" onClick={onClose} />
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={english ? "Image viewer" : "作品大图"}>
+      <button className="lightbox-backdrop" type="button" aria-label={english ? "Close image viewer" : "关闭大图"} onClick={onClose} />
       <div className="lightbox-toolbar">
         <span>{String(index + 1).padStart(2, "0")} / {String(images.length).padStart(2, "0")}</span>
-        <button type="button" onClick={onClose} aria-label="关闭">
+        <button type="button" onClick={onClose} aria-label={english ? "Close" : "关闭"}>
           <X aria-hidden="true" />
         </button>
       </div>
       <button
         className="lightbox-arrow lightbox-prev"
         type="button"
-        aria-label="上一张"
+        aria-label={english ? "Previous image" : "上一张"}
         onClick={() => onChange((index - 1 + images.length) % images.length)}
       >
         <ChevronLeft aria-hidden="true" />
       </button>
       <figure className="lightbox-figure">
-        <img key={src} src={src} alt={`作品图片 ${index + 1}`} onError={({ currentTarget }) => {
+        <img key={src} src={src} alt={english ? `Project image ${index + 1}` : `作品图片 ${index + 1}`} onError={({ currentTarget }) => {
           if (src !== original && currentTarget.getAttribute("src") === src) currentTarget.src = original;
         }} />
       </figure>
       <button
         className="lightbox-arrow lightbox-next"
         type="button"
-        aria-label="下一张"
+        aria-label={english ? "Next image" : "下一张"}
         onClick={() => onChange((index + 1) % images.length)}
       >
         <ChevronRight aria-hidden="true" />
