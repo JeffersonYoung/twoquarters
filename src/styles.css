@@ -797,18 +797,17 @@ main {
   line-height: 1.25;
 }
 
-.project-longform-page { padding-top: 100px; }
+.project-longform-page { padding-top: 0; }
 .longform-heading { max-width: 1600px; margin: 0 auto; padding: 28px 24px 16px; }
 .longform-heading > a { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; }
 .longform-heading > a svg { width: 16px; height: 16px; }
 .longform-heading h1 { margin: 20px 0 0; font-size: clamp(1.4rem, 3vw, 2.5rem); font-weight: 400; }
 .project-longform-page .project-metadata { padding: 16px 24px 32px; font-size: 0.9rem; }
-.project-longform { width: 100%; max-width: 1600px; margin: 0 auto; }
+.project-longform { width: 100%; margin: 0; }
 .project-longform > img { display: block; width: 100%; height: auto; max-height: none; object-fit: contain; }
 .admin-longform-preview { margin-bottom: 24px; }
 .admin-longform-preview summary { cursor: pointer; padding: 16px 0; }
 @media (max-width: 640px) {
-  .project-longform-page { padding-top: 72px; }
   .longform-heading { padding: 20px 16px 12px; }
 }
 

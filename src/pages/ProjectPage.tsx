@@ -32,6 +32,9 @@ export function ProjectPage() {
 
   return (
     <main className={`project-page${isVideoProject ? " project-watch-page" : ""}${isLongform ? " project-longform-page" : ""}`}>
+      {isLongform && longformImage && <section className="project-longform" aria-label={english ? "Complete photographic essay" : "完整长图作品"}>
+        <img src={longformImage.src} alt={english ? project.titleEn || project.title : project.title} width={longformImage.width} height={longformImage.height} {...highPriorityImage} loading="eager" decoding="async" />
+      </section>}
       {isLongform ? <header className="longform-heading">
         <Link to={localizedHref("/works", english)}><ArrowLeft aria-hidden="true" />{english ? "All work" : "所有作品"}</Link>
         <h1>{english ? project.titleEn || project.title : project.title}</h1>
@@ -56,9 +59,7 @@ export function ProjectPage() {
 
       
 
-      {isLongform && longformImage && <section className="project-longform" aria-label={english ? "Complete photographic essay" : "完整长图作品"}>
-        <img src={longformImage.src} alt={english ? project.titleEn || project.title : project.title} width={longformImage.width} height={longformImage.height} {...highPriorityImage} loading="eager" decoding="async" />
-      </section>}
+
 
       {!isLongform && !isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
