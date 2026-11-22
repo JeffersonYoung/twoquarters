@@ -518,16 +518,17 @@ test('both project layouts link adjacent cover cards and preserve English naviga
   const after = { ...project, id: 'after', slug: 'after', title: 'After', cover: images[3] };
   for (const presentation of ['gallery', 'longform']) {
     const fixture = { ...project, presentation, longformImageId: images[1].id };
-    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture, projects: [before, fixture, after], search: '?lang=en' });
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture, projects: [{ ...before, id: 'before2', slug: 'before2' }, before, fixture, after, { ...after, id: 'after2', slug: 'after2' }], search: '?lang=en' });
     const nav = render(ProjectPage).match(/<nav class="project-pagination"[\s\S]*?<\/nav>/)[0];
     assert.match(nav, /href="\/works\/before\?lang=en"/);
     assert.match(nav, /href="\/works\/after\?lang=en"/);
     const tags = imgTags(nav);
-    assert.equal(tags.length, 2);
+    assert.equal(tags.length, 4);
     assert.equal(attr(tags[0], 'src'), before.cover.src + '?width=480');
-    assert.equal(attr(tags[1], 'src'), after.cover.src + '?width=480');
+    assert.equal(attr(tags[2], 'src'), after.cover.src + '?width=480');
     for (const img of tags) assert.equal(attr(img, 'loading'), 'lazy');
-    assert.match(nav, /Previous project/);
-    assert.match(nav, /Next project/);
+    assert.deepEqual([...nav.matchAll(/href="([^"]+)"/g)].map(m => m[1]), ['/works/before2?lang=en', '/works/before?lang=en', '/works/after?lang=en', '/works/after2?lang=en']);
+    assert.match(nav, /Previous 2/);
+    assert.match(nav, /Next 2/);
   }
 });

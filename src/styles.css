@@ -896,7 +896,7 @@ main {
 
 .project-pagination {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid currentColor;
 }
 
@@ -925,15 +925,12 @@ main {
   width: 100%;
 }
 
-.project-pagination a:last-child .project-pagination-caption { justify-content: flex-end; }
+.project-pagination-next .project-pagination-caption { justify-content: flex-end; }
 .project-pagination a:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
 .project-pagination strong { overflow-wrap: anywhere; }
 
-.project-pagination a:last-child {
-  justify-content: flex-end;
-  border-left: 1px solid currentColor;
-  text-align: right;
-}
+.project-pagination a + a { border-left: 1px solid currentColor; }
+.project-pagination-next { text-align: right; }
 
 .project-pagination a:hover {
   background: var(--ink-soft);
@@ -950,7 +947,7 @@ main {
 
 .project-pagination strong {
   color: inherit;
-  font-size: 1.65rem;
+  font-size: clamp(1rem, 1.4vw, 1.65rem);
   font-weight: 550;
 }
 
@@ -1670,7 +1667,7 @@ main {
   }
 
   .project-pagination { grid-template-columns: 1fr; }
-  .project-pagination a:last-child { border-left: 0; border-top: 1px solid currentColor; }
+  .project-pagination a + a { border-left: 0; border-top: 1px solid currentColor; }
   .project-pagination-caption { gap: 12px; }
 
   .project-pagination a {

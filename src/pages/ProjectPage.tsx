@@ -27,8 +27,13 @@ export function ProjectPage() {
   const longformImage = project.images.find(image => image.id === project.longformImageId);
   const videos = playableVideos(project);
   const isVideoProject = !isLongform && (project.category === "video" || videos.length > 0);
-  const previous = projects[(projectIndex - 1 + projects.length) % projects.length];
-  const next = projects[(projectIndex + 1) % projects.length];
+  const seen = new Set([project.id]);
+  const adjacent = [-2, -1, 1, 2].flatMap(offset => {
+    const item = projects[((projectIndex + offset) % projects.length + projects.length) % projects.length];
+    if (seen.has(item.id)) return [];
+    seen.add(item.id);
+    return [{ item, offset }];
+  });
 
   return (
     <main className={`project-page${isVideoProject ? " project-watch-page" : ""}${isLongform ? " project-longform-page" : ""}`}>
@@ -80,13 +85,13 @@ export function ProjectPage() {
       </section>}
 
       {projects.length > 1 && <nav className="project-pagination" aria-label={english ? "Project navigation" : "项目导航"}>
-        {[previous, next].map((item, index) => (
-          <Link key={index} to={localizedHref(`/works/${item.slug}`, english)}>
-            <img {...responsiveImage(item.cover.src, [480, 960], "(max-width: 640px) calc(100vw - 32px), calc(50vw - 56px)", item.cover.width)} alt="" width={item.cover.width} height={item.cover.height} loading="lazy" decoding="async" />
+        {adjacent.map(({ item, offset }) => (
+          <Link key={item.id} className={offset < 0 ? "project-pagination-previous" : "project-pagination-next"} to={localizedHref(`/works/${item.slug}`, english)}>
+            <img {...responsiveImage(item.cover.src, [480, 960], "(max-width: 640px) calc(100vw - 32px), calc(25vw - 56px)", item.cover.width)} alt="" width={item.cover.width} height={item.cover.height} loading="lazy" decoding="async" />
             <div className="project-pagination-caption">
-              {index === 0 && <ArrowLeft aria-hidden="true" />}
-              <span>{index === 0 ? (english ? "Previous project" : "上一个项目") : (english ? "Next project" : "下一个项目")}<strong>{english ? item.titleEn || item.title : item.title}</strong></span>
-              {index === 1 && <ArrowRight aria-hidden="true" />}
+              {offset < 0 && <ArrowLeft aria-hidden="true" />}
+              <span>{english ? `${offset < 0 ? "Previous" : "Next"} ${Math.abs(offset)}` : `${offset < 0 ? "前" : "后"} ${Math.abs(offset)} 个项目`}<strong>{english ? item.titleEn || item.title : item.title}</strong></span>
+              {offset > 0 && <ArrowRight aria-hidden="true" />}
             </div>
           </Link>
         ))}
