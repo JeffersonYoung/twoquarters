@@ -528,7 +528,7 @@ test('both project layouts link adjacent cover cards and preserve English naviga
     assert.equal(attr(tags[2], 'src'), after.cover.src + '?width=480');
     for (const img of tags) assert.equal(attr(img, 'loading'), 'lazy');
     assert.deepEqual([...nav.matchAll(/href="([^"]+)"/g)].map(m => m[1]), ['/works/before2?lang=en', '/works/before?lang=en', '/works/after?lang=en', '/works/after2?lang=en']);
-    assert.match(nav, /Previous 2/);
-    assert.match(nav, /Next 2/);
+    assert.doesNotMatch(nav, /Previous|Next|<svg/);
+
   }
 });

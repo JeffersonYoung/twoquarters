@@ -916,34 +916,25 @@ main {
   aspect-ratio: 16 / 9;
   height: auto;
   object-fit: contain;
+  transform: scale(0.75);
+  transform-origin: center;
 }
 
 .project-pagination-caption {
-  display: flex;
-  align-items: center;
-  gap: 24px;
   width: 100%;
+  text-align: center;
 }
 
-.project-pagination-next .project-pagination-caption { justify-content: flex-end; }
 .project-pagination a:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
 .project-pagination strong { overflow-wrap: anywhere; }
 
 .project-pagination a + a { border-left: 1px solid currentColor; }
-.project-pagination-next { text-align: right; }
 
 .project-pagination a:hover {
   background: var(--ink-soft);
   color: var(--white);
 }
 
-.project-pagination span {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
 
 .project-pagination strong {
   color: inherit;
@@ -951,9 +942,6 @@ main {
   font-weight: 550;
 }
 
-.project-pagination svg {
-  width: 26px;
-}
 
 .lightbox {
   position: fixed;
@@ -1668,7 +1656,7 @@ main {
 
   .project-pagination { grid-template-columns: 1fr; }
   .project-pagination a + a { border-left: 0; border-top: 1px solid currentColor; }
-  .project-pagination-caption { gap: 12px; }
+
 
   .project-pagination a {
     min-height: 150px;
@@ -1680,9 +1668,6 @@ main {
     font-size: 1rem;
   }
 
-  .project-pagination svg {
-    width: 19px;
-  }
 
   .lightbox-arrow {
     top: auto;

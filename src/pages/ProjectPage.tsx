@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Maximize2 } from "lucide-react";
+import { ArrowLeft, Maximize2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Lightbox } from "../components/Lightbox";
 import { ProjectWatch } from "../components/ProjectWatch";
@@ -85,17 +85,15 @@ export function ProjectPage() {
       </section>}
 
       {projects.length > 1 && <nav className="project-pagination" aria-label={english ? "Project navigation" : "项目导航"}>
-        {adjacent.map(({ item, offset }) => (
-          <Link key={item.id} className={offset < 0 ? "project-pagination-previous" : "project-pagination-next"} to={localizedHref(`/works/${item.slug}`, english)}>
+        {adjacent.map(({ item }) => (
+          <Link key={item.id} to={localizedHref(`/works/${item.slug}`, english)}>
             <img {...responsiveImage(item.cover.src, [480, 960], "(max-width: 640px) calc(100vw - 32px), calc(25vw - 56px)", item.cover.width)} alt="" width={item.cover.width} height={item.cover.height} loading="lazy" decoding="async" />
-            <div className="project-pagination-caption">
-              {offset < 0 && <ArrowLeft aria-hidden="true" />}
-              <span>{english ? `${offset < 0 ? "Previous" : "Next"} ${Math.abs(offset)}` : `${offset < 0 ? "前" : "后"} ${Math.abs(offset)} 个项目`}<strong>{english ? item.titleEn || item.title : item.title}</strong></span>
-              {offset > 0 && <ArrowRight aria-hidden="true" />}
-            </div>
+            <div className="project-pagination-caption"><strong>{english ? item.titleEn || item.title : item.title}</strong></div>
           </Link>
         ))}
-      </nav>}  {!isLongform && !isVideoProject && lightboxIndex !== null && (
+      </nav>}
+
+      {!isLongform && !isVideoProject && lightboxIndex !== null && (
         <Lightbox
           images={project.images}
           index={lightboxIndex}
