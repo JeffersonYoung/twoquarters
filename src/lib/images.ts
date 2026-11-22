@@ -9,6 +9,12 @@ const staticImagePaths = new Set([
   "/images/about/grassland-stream.jpg",
 ]);
 
+// Shared by public gallery originals and longform artwork. Draft previews stay on
+// the authenticated same-origin endpoint; CDN authorization checks publication.
+export function originalImageSource(src: string): string {
+  return localImagePath.test(src) ? `https://img.twoquarters.com.cn${src}` : src;
+}
+
 export function imageVariant(src: string, width: ImageWidth): string {
   if (localImagePath.test(src)) return `${src}?width=${width}`;
   if (staticImagePaths.has(src)) return `${src.slice(0, -4)}-${width}.webp`;

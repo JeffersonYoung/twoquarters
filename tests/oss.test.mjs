@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { originalKey, publishedOriginal } from '../server/oss.mjs';
 
-test('CDN authorization denies drafts, changed publication, queries, variants and non-read requests', () => {
+for (const presentation of ['gallery', 'longform']) test(presentation + ': CDN authorization denies drafts, changed publication, queries, variants and non-read requests', () => {
   const db = new DatabaseSync(':memory:');
   db.exec('CREATE TABLE projects (published INTEGER, data TEXT)');
   const id = '0cdac628-2f91-4921-a8d9-4076486927b0';
   const uri = `/${originalKey(id)}`;
-  db.prepare('INSERT INTO projects VALUES(?,?)').run(0, JSON.stringify({ images: [{ id, storagePath: id }] }));
+  db.prepare('INSERT INTO projects VALUES(?,?)').run(0, JSON.stringify({ presentation, longformImageId: id, images: [{ id, storagePath: id }] }));
   assert.equal(publishedOriginal(db, uri, 'GET'), false);
   db.exec('UPDATE projects SET published=1');
   for (const method of ['GET','HEAD']) assert.equal(publishedOriginal(db, uri, method), true);

@@ -1,3 +1,4 @@
+import { originalImageSource } from "../lib/images";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect } from "react";
 import type { ProjectImage } from "../data";
@@ -35,9 +36,7 @@ export function Lightbox({
 
   const image = images[index];
   const original = image.src;
-  const src = /^\/api\/images\/[a-f0-9-]{36}$/.test(original)
-    ? `https://img.twoquarters.com.cn${original}`
-    : original;
+  const src = originalImageSource(original);
 
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={english ? "Image viewer" : "作品大图"}>

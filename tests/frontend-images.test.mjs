@@ -83,7 +83,7 @@ test('longform displays one complete original, with no cover hero, gallery or li
   const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture });
   const html = renderToStaticMarkup(React.createElement(ProjectPage));
   assert.equal((html.match(/<img /g) || []).length, 1);
-  assert.ok(html.includes(`src="${images[1].src}"`));
+  assert.ok(html.includes(`src="https://img.twoquarters.com.cn${images[1].src}"`));
   assert.ok(html.includes('width="1600" height="12380"'));
   assert.ok(!html.includes('project-hero'));
   assert.ok(!html.includes('project-gallery'));

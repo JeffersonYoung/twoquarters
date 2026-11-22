@@ -5,7 +5,7 @@ import { ProjectWatch } from "../components/ProjectWatch";
 import { ProjectMetadata } from "../components/ProjectMetadata";
 import { playableVideos } from "../lib/videos";
 import { Reveal } from "../components/Reveal";
-import { highPriorityImage, projectGallerySizes, responsiveImage } from "../lib/images";
+import { highPriorityImage, originalImageSource, projectGallerySizes, responsiveImage } from "../lib/images";
 import { useProjects } from "../ProjectsContext";
 import { Link, Navigate, useParams, useLocation } from "../router";
 import { isEnglishLocation, localizedHref } from "../lib/language";
@@ -33,7 +33,9 @@ export function ProjectPage() {
   return (
     <main className={`project-page${isVideoProject ? " project-watch-page" : ""}${isLongform ? " project-longform-page" : ""}`}>
       {isLongform && longformImage && <section className="project-longform" aria-label={english ? "Complete photographic essay" : "完整长图作品"}>
-        <img src={longformImage.src} alt={english ? project.titleEn || project.title : project.title} width={longformImage.width} height={longformImage.height} {...highPriorityImage} loading="eager" decoding="async" />
+        <img src={originalImageSource(longformImage.src)} onError={({ currentTarget }) => {
+          if (currentTarget.getAttribute("src") !== longformImage.src) currentTarget.src = longformImage.src;
+        }} alt={english ? project.titleEn || project.title : project.title} width={longformImage.width} height={longformImage.height} {...highPriorityImage} loading="eager" decoding="async" />
       </section>}
       {isLongform ? <header className="longform-heading">
         <Link to={localizedHref("/works", english)}><ArrowLeft aria-hidden="true" />{english ? "All work" : "所有作品"}</Link>
