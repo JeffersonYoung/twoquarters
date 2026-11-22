@@ -1,4 +1,5 @@
 import { transportPolicy } from './transport.mjs';
+import { presentationDraft } from './presentation.mjs';
 import { loadSiteConfig } from './site-config.mjs';
 import { storageOverview } from './storage.mjs';
 import { projectVideos, startVideoQueue, stopVideoQueue, uploadVideo, deleteVideo, deleteProjectVideos, serveVideo } from './video.mjs';
@@ -60,7 +61,7 @@ function draft(value,previous={}){
  value={brand:previous.brand||'',agency:previous.agency||'',photographer:previous.photographer||'',retouchTeam:previous.retouchTeam||'',...value};
  if(value.featured !== undefined && typeof value.featured !== 'boolean')fail('精选状态格式不正确');
  if(value.shotAt!==undefined && !(value.shotAt===null&&previous.shotAt===null) && !validTime(value.shotAt))fail('请填写有效的拍摄时间');
- const d={featured:value.featured ?? previous.featured ?? false};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000,brand:200,agency:200,photographer:200,retouchTeam:200})){
+ const d={...presentationDraft(value,previous),featured:value.featured ?? previous.featured ?? false};for(const [key,max] of Object.entries({title:200,titleEn:200,category:30,year:20,discipline:200,summary:10000,credits:2000,brand:200,agency:200,photographer:200,retouchTeam:200})){
   if(value[key]!=null&&typeof value[key]!=='string')fail('文字资料格式不正确');d[key]=(value[key]||'').trim();if(d[key].length>max)fail('文字过长');
  }
  if(value.shotAt!==undefined)d.shotAt=value.shotAt;
@@ -184,7 +185,7 @@ async function handle(req,res){
    }
    if(!action&&method==='DELETE'){const p=getProject(id);db.prepare('DELETE FROM projects WHERE id=?').run(id);await deleteProjectVideos(id);for(const im of p.images)if(im.storagePath)await removeOriginal(im.id);return json(res,{ok:true});}
    if(action==='cover'&&method==='POST'){const value=await input(req),p=getProject(id),im=p.images.find(x=>x.id===value?.imageId);if(!im)fail('图片不存在',404);p.cover=im;return json(res,save(p));}
-   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await removeOriginal(im.id);return json(res,p);}
+   if(action==='images'&&imageId&&method==='DELETE'){const p=getProject(id),im=p.images.find(x=>x.id===imageId);if(!im)fail('图片不存在',404);if(p.longformImageId===imageId)fail('请先更换或清空正文长图，再删除此图片');p.images=p.images.filter(x=>x.id!==imageId);if(p.cover?.id===imageId)p.cover=p.images[0]||null;if(!p.cover)p.published=false;save(p);if(im.storagePath)await removeOriginal(im.id);return json(res,p);}
    if(action==='images'&&!imageId&&method==='POST'){
     getProject(id);if(!req.headers['content-type']?.startsWith('multipart/form-data;'))fail('需要图片表单',415);
     const bytes=await body(req,64*1024*1024);let form;try{form=await new Request(origin,{method:'POST',headers:{'Content-Type':req.headers['content-type']},body:bytes}).formData();}catch{fail('图片表单格式不正确');}

@@ -77,6 +77,20 @@ function loadSource(entry, { admin = false, fixture = project, projects = [fixtu
 
 const helper = loadSource('lib/images.ts');
 
+test('longform displays one complete original, with no cover hero, gallery or lightbox buttons', () => {
+  const fixture = { ...project, presentation: 'longform', longformImageId: images[1].id,
+    images: [images[0], { ...images[1], width: 1600, height: 12380 }] };
+  const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture });
+  const html = renderToStaticMarkup(React.createElement(ProjectPage));
+  assert.equal((html.match(/<img /g) || []).length, 1);
+  assert.ok(html.includes(`src="${images[1].src}"`));
+  assert.ok(html.includes('width="1600" height="12380"'));
+  assert.ok(!html.includes('project-hero'));
+  assert.ok(!html.includes('project-gallery'));
+  assert.ok(!html.includes('shot-expand'));
+  assert.ok(!html.includes('?width='));
+});
+
 test('English public pages translate headings, filters and controls, and use English project titles', () => {
   const fixture = { ...project, title: '中文项目', titleEn: 'English project' };
   for (const [entry, name] of [

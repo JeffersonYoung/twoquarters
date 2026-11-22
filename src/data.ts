@@ -25,6 +25,8 @@ export type ProjectVideo = {
 };
 
 export type Project = {
+  presentation?: "gallery" | "longform";
+  longformImageId?: string;
   id?: string;
   slug: string;
   title: string;

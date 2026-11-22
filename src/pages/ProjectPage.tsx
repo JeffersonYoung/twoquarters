@@ -23,14 +23,19 @@ export function ProjectPage() {
   if (projectIndex < 0) return <Navigate to={localizedHref("/works", english)} replace />;
 
   const project = projects[projectIndex];
+  const isLongform = project.presentation === "longform";
+  const longformImage = project.images.find(image => image.id === project.longformImageId);
   const videos = playableVideos(project);
-  const isVideoProject = project.category === "video" || videos.length > 0;
+  const isVideoProject = !isLongform && (project.category === "video" || videos.length > 0);
   const previous = projects[(projectIndex - 1 + projects.length) % projects.length];
   const next = projects[(projectIndex + 1) % projects.length];
 
   return (
-    <main className={`project-page${isVideoProject ? " project-watch-page" : ""}`}>
-      {isVideoProject ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
+    <main className={`project-page${isVideoProject ? " project-watch-page" : ""}${isLongform ? " project-longform-page" : ""}`}>
+      {isLongform ? <header className="longform-heading">
+        <Link to={localizedHref("/works", english)}><ArrowLeft aria-hidden="true" />{english ? "All work" : "所有作品"}</Link>
+        <h1>{english ? project.titleEn || project.title : project.title}</h1>
+      </header> : isVideoProject ? <ProjectWatch project={project} videos={videos} /> : <section className="project-hero">
         <img {...responsiveImage(project.cover.src, [960, 1600], "100vw", project.cover.width)} {...highPriorityImage} alt="" width={project.cover.width} height={project.cover.height} loading="eager" decoding="async" />
         <div className="project-hero-overlay" />
         <Link className="project-back" to="/works"><ArrowLeft aria-hidden="true" /> {english ? "All work" : "所有作品"}</Link>
@@ -51,7 +56,11 @@ export function ProjectPage() {
 
       
 
-      {!isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
+      {isLongform && longformImage && <section className="project-longform" aria-label={english ? "Complete photographic essay" : "完整长图作品"}>
+        <img src={longformImage.src} alt={english ? project.titleEn || project.title : project.title} width={longformImage.width} height={longformImage.height} {...highPriorityImage} loading="eager" decoding="async" />
+      </section>}
+
+      {!isLongform && !isVideoProject && <section className={`project-gallery gallery-${project.category}`}>
         {project.images.map((image, index) => (
           <Reveal key={image.src} className={`gallery-shot gallery-shot-${(index % 5) + 1}`}>
             <button type="button" onClick={() => setLightboxIndex(index)} aria-label={english ? `View image ${index + 1}` : `查看第 ${index + 1} 张大图`}>
@@ -78,7 +87,7 @@ export function ProjectPage() {
         </Link>
       </nav>
 
-      {!isVideoProject && lightboxIndex !== null && (
+      {!isLongform && !isVideoProject && lightboxIndex !== null && (
         <Lightbox
           images={project.images}
           index={lightboxIndex}

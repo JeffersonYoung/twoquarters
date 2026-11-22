@@ -58,6 +58,8 @@ const emptyDraft: ProjectDraft = {
   retouchTeam: "",
   published: false,
   featured: false,
+  presentation: "gallery",
+  longformImageId: "",
 };
 
 type EditorState = {
@@ -83,6 +85,8 @@ function projectDraft(project: AdminProject): ProjectDraft {
     retouchTeam: project.retouchTeam || "",
     published: project.published,
     featured: project.featured === true,
+    presentation: project.presentation || "gallery",
+    longformImageId: project.longformImageId || "",
   };
 }
 
@@ -569,6 +573,19 @@ export function AdminPage({ homeEditor = false }: { homeEditor?: boolean }) {
               <label>年份<input value={draft.year} required maxLength={8} onChange={(event) => updateDraft("year", event.target.value)} /></label>
               <label>拍摄时间<input type="datetime-local" step="1" required={!!selected} value={localDateTime(draft.shotAt)} onChange={(event) => updateDraft("shotAt", event.target.value ? new Date(event.target.value).getTime() : undefined)} /><small>{selected ? "用于作品排序，按当前设备时区填写" : "留空时使用项目创建时间"}</small></label>
               <label className="wide">服务内容<input value={draft.discipline} required onChange={(event) => updateDraft("discipline", event.target.value)} /></label>
+              <label>作品展示方式
+                <select value={draft.presentation || "gallery"} onChange={(event) => updateDraft("presentation", event.target.value as "gallery" | "longform")}>
+                  <option value="gallery">图片流</option>
+                  <option value="longform">整张长图</option>
+                </select>
+              </label>
+              {draft.presentation === "longform" && <label>正文长图
+                <select value={draft.longformImageId || ""} onChange={(event) => updateDraft("longformImageId", event.target.value)}>
+                  <option value="">上传图片后选择</option>
+                  {selected?.images.map((image, index) => <option key={image.id} value={image.id}>图片 {index + 1} · {image.width} × {image.height}</option>)}
+                </select>
+                <small>封面用于作品索引；详情页仅展示这张长图，保持完整比例。</small>
+              </label>}
               <label className="wide">项目简介<textarea rows={4} value={draft.summary} onChange={(event) => updateDraft("summary", event.target.value)} /></label>
               <label className="wide">项目署名<input value={draft.credits} onChange={(event) => updateDraft("credits", event.target.value)} /></label>
               <label>Brand（品牌，选填）<input value={draft.brand || ""} maxLength={200} onChange={(event) => updateDraft("brand", event.target.value)} /></label>
@@ -607,6 +624,12 @@ export function AdminPage({ homeEditor = false }: { homeEditor?: boolean }) {
         {selected && (
           <section className="image-manager">
             <div className="editor-section-heading"><span>02</span><h2>项目图片</h2><em>{selected.images.length} 张</em></div>
+            {selected.presentation === "longform" && selected.images.find(image => image.id === selected.longformImageId) && <details className="admin-longform-preview">
+              <summary>预览完整长图</summary>
+              <div className="project-longform">
+                {selected.images.filter(image => image.id === selected.longformImageId).map(image => <img key={image.id} src={image.src} alt={`${selected.title} · 完整长图`} width={image.width} height={image.height} loading="lazy" decoding="async" />)}
+              </div>
+            </details>}
             <div
               className={`upload-zone ${dragging ? "is-dragging" : ""}`}
               onDragEnter={(event) => { event.preventDefault(); if (!locked) setDragging(true); }}
