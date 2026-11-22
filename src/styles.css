@@ -902,12 +902,32 @@ main {
 
 .project-pagination a {
   display: flex;
-  min-height: 210px;
-  align-items: center;
+  flex-direction: column;
+  min-width: 0;
+  align-items: stretch;
   gap: 24px;
   padding: 28px;
   transition: background 180ms ease, color 180ms ease;
 }
+
+.project-pagination img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+}
+
+.project-pagination-caption {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.project-pagination a:last-child .project-pagination-caption { justify-content: flex-end; }
+.project-pagination a:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+.project-pagination strong { overflow-wrap: anywhere; }
 
 .project-pagination a:last-child {
   justify-content: flex-end;
@@ -1648,6 +1668,10 @@ main {
     margin: 0 16px;
     padding-bottom: 70px;
   }
+
+  .project-pagination { grid-template-columns: 1fr; }
+  .project-pagination a:last-child { border-left: 0; border-top: 1px solid currentColor; }
+  .project-pagination-caption { gap: 12px; }
 
   .project-pagination a {
     min-height: 150px;

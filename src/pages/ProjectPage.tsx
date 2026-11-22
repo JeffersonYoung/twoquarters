@@ -79,18 +79,18 @@ export function ProjectPage() {
         <p>{project.credits}</p>
       </section>}
 
-      <nav className="project-pagination" aria-label={english ? "Project navigation" : "项目导航"}>
-        <Link to={`/works/${previous.slug}`}>
-          <ArrowLeft aria-hidden="true" />
-          <span>{english ? "Previous project" : "上一个项目"}<strong>{english ? previous.titleEn || previous.title : previous.title}</strong></span>
-        </Link>
-        <Link to={`/works/${next.slug}`}>
-          <span>{english ? "Next project" : "下一个项目"}<strong>{english ? next.titleEn || next.title : next.title}</strong></span>
-          <ArrowRight aria-hidden="true" />
-        </Link>
-      </nav>
-
-      {!isLongform && !isVideoProject && lightboxIndex !== null && (
+      {projects.length > 1 && <nav className="project-pagination" aria-label={english ? "Project navigation" : "项目导航"}>
+        {[previous, next].map((item, index) => (
+          <Link key={index} to={localizedHref(`/works/${item.slug}`, english)}>
+            <img {...responsiveImage(item.cover.src, [480, 960], "(max-width: 640px) calc(100vw - 32px), calc(50vw - 56px)", item.cover.width)} alt="" width={item.cover.width} height={item.cover.height} loading="lazy" decoding="async" />
+            <div className="project-pagination-caption">
+              {index === 0 && <ArrowLeft aria-hidden="true" />}
+              <span>{index === 0 ? (english ? "Previous project" : "上一个项目") : (english ? "Next project" : "下一个项目")}<strong>{english ? item.titleEn || item.title : item.title}</strong></span>
+              {index === 1 && <ArrowRight aria-hidden="true" />}
+            </div>
+          </Link>
+        ))}
+      </nav>}  {!isLongform && !isVideoProject && lightboxIndex !== null && (
         <Lightbox
           images={project.images}
           index={lightboxIndex}

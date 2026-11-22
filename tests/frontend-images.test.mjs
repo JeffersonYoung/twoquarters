@@ -512,3 +512,22 @@ test('video production credits form one list with one row per role and no repeat
   ]);
   assert.ok(!markup.includes('class="project-credit"'), 'video credits appear only in the unified list');
 });
+
+test('both project layouts link adjacent cover cards and preserve English navigation', () => {
+  const before = { ...project, id: 'before', slug: 'before', title: 'Before', cover: images[2] };
+  const after = { ...project, id: 'after', slug: 'after', title: 'After', cover: images[3] };
+  for (const presentation of ['gallery', 'longform']) {
+    const fixture = { ...project, presentation, longformImageId: images[1].id };
+    const { ProjectPage } = loadSource('pages/ProjectPage.tsx', { fixture, projects: [before, fixture, after], search: '?lang=en' });
+    const nav = render(ProjectPage).match(/<nav class="project-pagination"[\s\S]*?<\/nav>/)[0];
+    assert.match(nav, /href="\/works\/before\?lang=en"/);
+    assert.match(nav, /href="\/works\/after\?lang=en"/);
+    const tags = imgTags(nav);
+    assert.equal(tags.length, 2);
+    assert.equal(attr(tags[0], 'src'), before.cover.src + '?width=480');
+    assert.equal(attr(tags[1], 'src'), after.cover.src + '?width=480');
+    for (const img of tags) assert.equal(attr(img, 'loading'), 'lazy');
+    assert.match(nav, /Previous project/);
+    assert.match(nav, /Next project/);
+  }
+});
