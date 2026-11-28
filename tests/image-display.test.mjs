@@ -16,13 +16,13 @@ const rule = selector => {
   return declarations(found[0]);
 };
 
-test('all work-image surfaces use contain; only decorative home/about backgrounds may use cover', () => {
+test('work-image surfaces use contain; homepage category cards and decorative backgrounds may use cover', () => {
   for (const selector of ['.project-card img', '.project-hero > img', '.gallery-shot img', '.lightbox-figure img', '.admin-image-grid img', '.carousel-admin-grid img']) {
     assert.equal(rule(selector)['object-fit'], 'contain', selector);
   }
   const coverSelectors = [];
   css.walkDecls('object-fit', decl => { if (decl.value === 'cover') coverSelectors.push(decl.parent.selector); });
-  assert.deepEqual(coverSelectors.sort(), ['.about-image-band img', '.hero-carousel > img', '.hero-carousel-slide img', '.home-hero > img']);
+  assert.deepEqual(coverSelectors.sort(), ['.about-image-band img', '.hero-carousel > img', '.hero-carousel-slide img', '.home-category-card img', '.home-hero > img']);
   assert.equal(rule('.hero-carousel-slide img')['object-fit'], 'cover');
 });
 

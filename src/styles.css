@@ -2369,7 +2369,7 @@ main {
 .home-category-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
 .home-category-card { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; background: #17191b; border: 1px solid #555; }
 .home-category-card::after { content: ""; position: absolute; inset: 6px; border: 1px solid #ffffff70; pointer-events: none; }
-.home-category-card img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: contain; opacity: .5; transition: opacity 200ms ease; }
+.home-category-card img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; opacity: .5; transition: opacity 200ms ease; }
 .home-category-card:hover img, .home-category-card:focus-visible img { opacity: .75; }
 .home-category-card:focus-visible { outline: 2px solid white; outline-offset: 4px; }
 .home-category-label { position: relative; z-index: 1; text-align: center; padding: 20px; color: white; text-shadow: 0 2px 12px #000; }
