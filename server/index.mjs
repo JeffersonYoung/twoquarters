@@ -9,6 +9,7 @@ import { putOriginal, deleteOriginal, publishedOriginal } from './oss.mjs';
 import { publishedVideo } from './video-oss.mjs';
 import { initializeProjectTimes, validTime } from './project-times.mjs';
 import { createHomeCarousel } from './home-carousel.mjs';
+import { createHomeCategories } from './home-categories.mjs';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { readFile, writeFile, stat } from 'node:fs/promises';
@@ -46,6 +47,7 @@ db.exec(`
             WHERE json_type(image.value,'$.alt') IS NOT NULL OR json_type(image.value,'$.credit') IS NOT NULL)
 `);
 initializeProjectTimes(db);
+const homeCategories = await createHomeCategories(dataDir, db.prepare('SELECT data FROM projects WHERE published=1 ORDER BY sort_order,rowid DESC').all().map(r=>JSON.parse(r.data)).sort((a,b)=>(b.shotAt??0)-(a.shotAt??0)));
 await startVideoQueue();
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 const json=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
@@ -81,7 +83,7 @@ async function handle(req,res){
  // No HSTS: its host-wide policy would also force public pages onto HTTPS.
  const url=new URL(req.url,origin),route=url.pathname,method=req.method;
  if(route==='/api/cdn-auth') {
-  const allowed=method==='GET' && (publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||publishedVideo(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCarousel.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']));
+  const allowed=method==='GET' && (publishedOriginal(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||publishedVideo(db,req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCarousel.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method'])||homeCategories.allows(req.headers['x-tq-original-uri'],req.headers['x-tq-original-method']));
   res.writeHead(allowed?200:403,{'Content-Length':'0'});return res.end();
  }
  const imageCdn=req.headers['x-twoquarters-image-cdn']==='1';
@@ -116,6 +118,15 @@ async function handle(req,res){
   if(route==='/api/logout'&&method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(current.token);res.setHeader('Set-Cookie',cookie('',0));return json(res,{ok:true});}
   if(route.startsWith('/api/admin/')&&!current)fail('请先登录',401);
   if(route==='/api/home-carousel'&&method==='GET')return json(res,homeCarousel.snapshot());
+  if((route==='/api/home-categories'||route==='/api/admin/home-categories')&&method==='GET')return json(res,homeCategories.snapshot());
+  const categoryCover=route.match(/^\/api\/admin\/home-categories\/([a-z-]+)$/);
+  if(categoryCover&&method==='POST'){
+   if(!['image/jpeg','image/png','image/webp'].includes(req.headers['content-type']))fail('请上传 JPEG、PNG 或 WebP 图片',415);
+   let name;try{name=decodeURIComponent(req.headers['x-upload-name']||'');}catch{fail('文件名格式不正确');}
+   const revision=req.headers['x-config-revision'];
+   return json(res,await homeCategories.replace(categoryCover[1],typeof revision==='string'&&/^\d+$/.test(revision)?Number(revision):null,await body(req,40*1024*1024),name));
+  }
+  if(categoryCover&&method==='DELETE')return json(res,await homeCategories.remove(categoryCover[1],(await input(req)).revision));
   if(route==='/api/admin/home-carousel'){
    if(method==='GET')return json(res,homeCarousel.snapshot(true));
    if(method==='PATCH')return json(res,await homeCarousel.update(await input(req)));
@@ -149,6 +160,7 @@ async function handle(req,res){
    const iid=route.slice(12);if(!/^[a-f0-9-]{36}$/.test(iid))fail('图片不存在',404);
    const lookup=()=>{
     const slideImage=homeCarousel.find(iid,!!current);if(slideImage)return slideImage;
+    const categoryImage=homeCategories.find(iid);if(categoryImage)return categoryImage;
     const rows=db.prepare('SELECT data FROM projects'+(current?'':' WHERE published=1')).all();
     for(const r of rows){
      const project=JSON.parse(r.data);

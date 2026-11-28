@@ -345,7 +345,9 @@ test('Home prioritizes the responsive static hero and defers category covers; Ab
   assert.equal(attr(hero, 'loading'), 'eager');
   assert.equal(attr(hero, 'fetchPriority'), 'high');
   assert.ok(attr(hero, 'srcSet').includes('-1600.webp 1600w'));
-  assert.equal(cards.length, 1);
+  // Category covers are fetched independently; project covers must not leak in
+  // as an automatic fallback before the category configuration has loaded.
+  assert.equal(cards.length, 0);
   for (const category of ["automotive", "cg-ai", "fmcg", "video", "bts"]) assert.ok(render(HomePage).includes(`/works?category=${category}`));
   assert.ok(!render(HomePage).includes('/works/work-3'));
   for (const card of cards) assert.equal(attr(card, 'loading'), 'lazy');

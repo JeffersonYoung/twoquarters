@@ -106,6 +106,10 @@ export const getStorageOverview = (signal?: AbortSignal) => api<StorageOverview>
 
 export type HomeSlide = { id: string; name: string; alt: string; enabled: boolean; variants: { id: string; src: string; width: number; height: number }[] };
 export type HomeCarouselConfig = { revision: number; interval: number; slides: HomeSlide[] };
+export type HomeCategoryConfig = { revision: number; covers: Partial<Record<Project["category"], { name: string; variants: HomeSlide["variants"] }>> };
+export const getHomeCategories = () => api<HomeCategoryConfig>("/admin/home-categories");
+export const uploadCategoryCover = (category: string, revision: number, file: File) => api<HomeCategoryConfig>(`/admin/home-categories/${encodeURIComponent(category)}`, "POST", file, undefined, { "X-Config-Revision": String(revision) });
+export const removeCategoryCover = (category: string, revision: number) => api<HomeCategoryConfig>(`/admin/home-categories/${encodeURIComponent(category)}`, "DELETE", { revision });
 export const getHomeCarousel = () => api<HomeCarouselConfig>("/admin/home-carousel");
 export const saveHomeCarousel = (value: HomeCarouselConfig) => api<HomeCarouselConfig>("/admin/home-carousel", "PATCH", value);
 export const uploadHomeSlide = (file: File) => api<HomeCarouselConfig>("/admin/home-carousel/images", "POST", file);

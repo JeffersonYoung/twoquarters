@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { deleteHomeSlide, getHomeCarousel, saveHomeCarousel, uploadHomeSlide, type HomeCarouselConfig } from "../lib/projects";
 import { Link } from "../router";
+import { HomeCategoryAdmin } from "../components/HomeCategoryAdmin";
 
 export function HomeCarouselAdmin({ logout }: { logout: () => void }) {
   const [config, setConfig] = useState<HomeCarouselConfig | null>(null);
@@ -44,6 +45,7 @@ export function HomeCarouselAdmin({ logout }: { logout: () => void }) {
       <Link to="/" target="_blank">查看首页 ↗</Link>
       <button type="button" disabled={busy} onClick={() => { if (canLeave()) logout(); }}>退出</button>
     </div></header>
+    <HomeCategoryAdmin />
     <section className="carousel-editor">
       <h1>首页轮播</h1><p>按列表顺序循环展示。上传后勾选展示，调整顺序并保存生效；隐藏和删除会停止图片的公开访问。</p>
       {error && <p role="alert" className="carousel-error">{error} <button disabled={busy} onClick={() => { if (canLeave()) void run(async () => accept(await getHomeCarousel())); }}>重新加载</button></p>}

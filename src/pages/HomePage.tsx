@@ -1,6 +1,8 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { categoryLabels, categoryLabelsEn, selectableCategories } from "../data";
-import { responsiveImage } from "../lib/images";
+import { originalImageSource } from "../lib/images";
+import { useEffect, useState } from "react";
+import type { HomeCategoryConfig } from "../lib/projects";
 import { Reveal } from "../components/Reveal";
 import { HomeCarousel } from "../components/HomeCarousel";
 import { localizedHref } from "../lib/language";
@@ -15,10 +17,18 @@ const capabilities = [
 
 export function HomePage({ english = false }: { english?: boolean }) {
   const { projects } = useProjects();
+  const [covers, setCovers] = useState<HomeCategoryConfig["covers"]>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/home-categories", { signal: controller.signal, cache: "no-store" })
+      .then(response => { if (!response.ok) throw Error("Category covers unavailable"); return response.json(); })
+      .then((value: HomeCategoryConfig) => setCovers(value.covers)).catch(() => {});
+    return () => controller.abort();
+  }, []);
   const workLabel = english ? "Work categories" : "作品栏目";
   const categories = selectableCategories.map(category => {
     const items = projects.filter(project => project.category === category);
-    const cover = (items.find(project => project.featured) || items[0])?.cover;
+    const cover = covers[category];
     return { category, count: items.length, cover };
   });
 
@@ -65,7 +75,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
         <div className="home-category-index">
           {categories.map(({ category, count, cover }) => (
             <Link key={category} className={`home-category-card${category === "automotive" ? " home-category-card--automotive" : ""}`} to={localizedHref(`/works?category=${category}`, english)}>
-              {cover && <img {...responsiveImage(cover.src, [480, 960, 1600], category === "automotive" ? "(max-width: 640px) 100vw, 50vw" : "(max-width: 640px) 50vw, 25vw", cover.width)} alt="" width={cover.width} height={cover.height} loading="lazy" decoding="async" />}
+              {cover && <img src={originalImageSource(cover.variants[0].src)} srcSet={cover.variants.map(v => `${originalImageSource(v.src)} ${v.width}w`).join(", ")} sizes={category === "automotive" ? "(max-width: 640px) 100vw, 50vw" : "(max-width: 640px) 50vw, 25vw"} alt="" loading="lazy" decoding="async" onError={event => { const image = event.currentTarget; if (image.dataset.fallback) return; image.dataset.fallback = "true"; image.srcset = cover.variants.map(v => `${v.src} ${v.width}w`).join(", "); image.src = cover.variants[0].src; }} />}
               <div className="home-category-label">
                 <h3>{english ? categoryLabelsEn[category] : categoryLabels[category]}</h3>
                 <p>{count} {english ? (count === 1 ? "project" : "projects") : "个项目"}</p>

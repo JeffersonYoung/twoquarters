@@ -511,7 +511,7 @@ export function AdminPage({ homeEditor = false }: { homeEditor?: boolean }) {
         </button>
         <span className="admin-brand">TWOQUARTERS <i>ADMIN</i></span>
         <div>
-          <Link to="/admin/home" onClick={event => { if (!canLeaveDraft()) event.preventDefault(); }}>首页轮播</Link>
+          <Link to="/admin/home" onClick={event => { if (!canLeaveDraft()) event.preventDefault(); }}>首页设置</Link>
           <Link to="/" target="_blank">查看网站 <ArrowUpRight aria-hidden="true" /></Link>
           <button type="button" onClick={() => void logout()} disabled={locked}><LogOut aria-hidden="true" /> 退出</button>
         </div>
