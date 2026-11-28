@@ -2366,8 +2366,9 @@ main {
 }
 
 /* Homepage category directory: the same public covers and image variants as work cards. */
-.home-category-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
-.home-category-card { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; background: #17191b; border: 1px solid #555; }
+.home-category-index { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); aspect-ratio: 2; gap: 20px; }
+.home-category-card { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; background: #17191b; border: 1px solid #555; }
+.home-category-card--automotive { grid-column: span 2; grid-row: span 2; }
 .home-category-card::after { content: ""; position: absolute; inset: 6px; border: 1px solid #ffffff70; pointer-events: none; }
 .home-category-card img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; opacity: .5; transition: opacity 200ms ease; }
 .home-category-card:hover img, .home-category-card:focus-visible img { opacity: .75; }
@@ -2375,5 +2376,8 @@ main {
 .home-category-label { position: relative; z-index: 1; text-align: center; padding: 20px; color: white; text-shadow: 0 2px 12px #000; }
 .home-category-label h3 { font-size: clamp(1.1rem, 2vw, 1.8rem); margin: 0 0 10px; }
 .home-category-label p { font-size: .8rem; margin: 0; }
-@media (max-width: 900px) { .home-category-index { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .home-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
+@media (max-width: 640px) {
+  .home-category-index { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; aspect-ratio: auto; gap: 12px; }
+  .home-category-card { aspect-ratio: 1; }
+  .home-category-card--automotive { grid-row: auto; aspect-ratio: 4 / 3; }
+}

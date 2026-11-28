@@ -64,8 +64,8 @@ export function HomePage({ english = false }: { english?: boolean }) {
         </div>
         <div className="home-category-index">
           {categories.map(({ category, count, cover }) => (
-            <Link key={category} className="home-category-card" to={localizedHref(`/works?category=${category}`, english)}>
-              {cover && <img {...responsiveImage(cover.src, [480, 960], "(max-width: 640px) 50vw, 20vw", cover.width)} alt="" width={cover.width} height={cover.height} loading="lazy" decoding="async" />}
+            <Link key={category} className={`home-category-card${category === "automotive" ? " home-category-card--automotive" : ""}`} to={localizedHref(`/works?category=${category}`, english)}>
+              {cover && <img {...responsiveImage(cover.src, [480, 960, 1600], category === "automotive" ? "(max-width: 640px) 100vw, 50vw" : "(max-width: 640px) 50vw, 25vw", cover.width)} alt="" width={cover.width} height={cover.height} loading="lazy" decoding="async" />}
               <div className="home-category-label">
                 <h3>{english ? categoryLabelsEn[category] : categoryLabels[category]}</h3>
                 <p>{count} {english ? (count === 1 ? "project" : "projects") : "个项目"}</p>
