@@ -202,17 +202,18 @@ test('Works sorts by shooting time, independent of update/publication, preservin
   const projects = rows.map(([slug, category, shotAt], index) => ({ ...project, slug, category, shotAt, publishedAt: 1000-index, updatedAt: 1000-index }));
   const { WorksPage } = loadSource('pages/WorksPage.tsx', { projects });
   const links = [...render(WorksPage).matchAll(/href="\/works\/([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(links, ['latest', 'older', 'legacy-a', 'legacy-b', 'cgi', 'consumer', 'video', 'behind']);
+  assert.deepEqual(links, ['latest', 'older', 'legacy-a', 'legacy-b']);
   assert.deepEqual(projects.map(p => p.slug), rows.map(row => row[0]));
   const filtered = loadSource('pages/WorksPage.tsx', { projects, search: '?category=automotive' });
   assert.deepEqual([...render(filtered.WorksPage).matchAll(/href="\/works\/([^"]+)"/g)].map(match=>match[1]), ['latest','older','legacy-a','legacy-b']);
 });
 
-test('Works falls back to all projects for an unknown category', () => {
+test('Works defaults to the first category and removes the All tab', () => {
   const { WorksPage } = loadSource('pages/WorksPage.tsx', { search: '?category=unknown' });
   const markup = render(WorksPage);
-  assert.match(markup, /<button[^>]*aria-selected="true"[^>]*>全部/);
+  assert.match(markup, /<button[^>]*aria-selected="true"[^>]*>汽车/);
   assert.ok(markup.includes('href="/works/fixture"'));
+  assert.doesNotMatch(markup, />全部|>All</);
 });
 
 test('local uploaded images receive bounded responsive URLs with a resized fallback', () => {
@@ -333,7 +334,7 @@ test('lightbox renders only the selected original, without preloading other orig
   }
 });
 
-test('Home prioritizes the responsive static hero and defers all featured cards; About defers its image', () => {
+test('Home prioritizes the responsive static hero and defers category covers; About defers its image', () => {
   const projects = Array.from({ length: 7 }, (_, i) => ({
     ...project, slug: 'work-' + i, published: true, featured: i !== 3,
   }));
@@ -344,7 +345,8 @@ test('Home prioritizes the responsive static hero and defers all featured cards;
   assert.equal(attr(hero, 'loading'), 'eager');
   assert.equal(attr(hero, 'fetchPriority'), 'high');
   assert.ok(attr(hero, 'srcSet').includes('-1600.webp 1600w'));
-  assert.equal(cards.length, 6);
+  assert.equal(cards.length, 1);
+  for (const category of ["automotive", "cg-ai", "fmcg", "video", "bts"]) assert.ok(render(HomePage).includes(`/works?category=${category}`));
   assert.ok(!render(HomePage).includes('/works/work-3'));
   for (const card of cards) assert.equal(attr(card, 'loading'), 'lazy');
   const { AboutPage } = loadSource('pages/AboutPage.tsx');

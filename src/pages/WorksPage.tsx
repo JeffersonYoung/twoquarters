@@ -5,10 +5,9 @@ import { isEnglishLocation } from "../lib/language";
 import { useProjects } from "../ProjectsContext";
 import { useLocation } from "../router";
 
-type Filter = "all" | ProjectCategory;
+type Filter = ProjectCategory;
 
 const filters: { value: Filter; label: string }[] = [
-  { value: "all", label: "全部" },
   ...selectableCategories.map(value => ({ value, label: categoryLabels[value] })),
 ];
 
@@ -17,17 +16,12 @@ export function WorksPage() {
   const { projects } = useProjects();
   const { search, hash = "", navigate } = useLocation();
   const category = new URLSearchParams(search).get("category");
-  const filter: Filter = filters.find((item) => item.value === category)?.value ?? "all";
-  const visibleProjects = filter === "all"
-    ? [...projects].sort((a, b) =>
-        selectableCategories.indexOf(a.category) - selectableCategories.indexOf(b.category)
-        || (b.shotAt ?? 0) - (a.shotAt ?? 0))
-    : projects.filter((project) => project.category === filter).sort((a, b) => (b.shotAt ?? 0) - (a.shotAt ?? 0));
+  const filter: Filter = filters.find((item) => item.value === category)?.value ?? selectableCategories[0];
+  const visibleProjects = projects.filter((project) => project.category === filter).sort((a, b) => (b.shotAt ?? 0) - (a.shotAt ?? 0));
 
   function setFilter(value: Filter) {
     const params = new URLSearchParams(search);
-    if (value === "all") params.delete("category");
-    else params.set("category", value);
+    params.set("category", value);
     const query = params.toString();
     navigate(`/works${query ? `?${query}` : ""}${hash}`);
   }
@@ -50,9 +44,9 @@ export function WorksPage() {
               aria-selected={filter === item.value}
               onClick={() => setFilter(item.value)}
             >
-              {english ? (item.value === "all" ? "All" : categoryLabelsEn[item.value]) : item.label}
+              {english ? categoryLabelsEn[item.value] : item.label}
               <span>
-                {item.value === "all" ? projects.length : projects.filter((project) => project.category === item.value).length}
+                {projects.filter((project) => project.category === item.value).length}
               </span>
             </button>
           ))}

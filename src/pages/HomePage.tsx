@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
-import { ProjectCard } from "../components/ProjectCard";
+import { categoryLabels, categoryLabelsEn, selectableCategories } from "../data";
+import { responsiveImage } from "../lib/images";
 import { Reveal } from "../components/Reveal";
 import { HomeCarousel } from "../components/HomeCarousel";
 import { localizedHref } from "../lib/language";
@@ -14,8 +15,12 @@ const capabilities = [
 
 export function HomePage({ english = false }: { english?: boolean }) {
   const { projects } = useProjects();
-  const featured = projects.filter((project) => project.featured);
-  const workLabel = featured.length ? (english ? "Selected work" : "精选作品") : (english ? "All work" : "全部作品");
+  const workLabel = english ? "Work categories" : "作品栏目";
+  const categories = selectableCategories.map(category => {
+    const items = projects.filter(project => project.category === category);
+    const cover = (items.find(project => project.featured) || items[0])?.cover;
+    return { category, count: items.length, cover };
+  });
 
   return (
     <main>
@@ -29,7 +34,7 @@ export function HomePage({ english = false }: { english?: boolean }) {
         <div className="hero-title">
           <h1>TWO<br />QUARTERS</h1>
         </div>
-        <a className="hero-scroll" href={featured.length ? "#work" : localizedHref("/works", english)}>
+        <a className="hero-scroll" href="#work">
           <span>{workLabel}</span>
           <ArrowDown aria-hidden="true" />
         </a>
@@ -51,17 +56,21 @@ export function HomePage({ english = false }: { english?: boolean }) {
         </p>
       </section>
 
-      <section className="selected-work" id="work" hidden={!featured.length}>
+      <section className="selected-work" id="work">
         <div className="section-heading">
           <span>01</span>
-          <h2>{english ? "Selected work" : "精选作品"}</h2>
-          {!english && <Link to="/works">查看全部 <ArrowRight aria-hidden="true" /></Link>}
+          <h2>{workLabel}</h2>
+
         </div>
-        <div className="home-projects">
-          {featured.map((project, index) => (
-            <Reveal key={project.slug} delay={(index % 2) * 80}>
-              <ProjectCard project={project} index={index} loading="lazy" />
-            </Reveal>
+        <div className="home-category-index">
+          {categories.map(({ category, count, cover }) => (
+            <Link key={category} className="home-category-card" to={localizedHref(`/works?category=${category}`, english)}>
+              {cover && <img {...responsiveImage(cover.src, [480, 960], "(max-width: 640px) 50vw, 20vw", cover.width)} alt="" width={cover.width} height={cover.height} loading="lazy" decoding="async" />}
+              <div className="home-category-label">
+                <h3>{english ? categoryLabelsEn[category] : categoryLabels[category]}</h3>
+                <p>{count} {english ? (count === 1 ? "project" : "projects") : "个项目"}</p>
+              </div>
+            </Link>
           ))}
         </div>
         {english && (
